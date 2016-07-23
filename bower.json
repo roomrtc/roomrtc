@@ -1,0 +1,31 @@
+{
+  "name": "roomrtc",
+  "version": "0.9.1",
+  "description": "RoomRTC enables quick development of webRTC",
+  "main": "index.js",
+  "authors": [
+    "Vunb"
+  ],
+  "license": "ISC",
+  "keywords": [
+    "rtc",
+    "room",
+    "webRTC",
+    "RoomRTC"
+  ],
+  "dependencies": {
+    "socket.io-client": "1.3.7"
+  },
+  "homepage": "https://github.com/Vunb/roomrtc",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests",
+    "demos",
+    "dev",
+    "docs",
+    "lib"
+  ]
+}
