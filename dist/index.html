@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="RoomRTC dev tests">
+    <title>RoomRTC dev tests</title>
+</head>
+
+<body>
+    <h1>Load RoomRTC API, ...</h1>
+    <script src="/roomrtc.bundle.js"></script>
+    <script type="text/javascript">
+        var room = location.search && location.search.split('?')[1];
+        var roomRTC = new RoomRTC();
+        roomRTC.on("connected", function (id) {
+            console.log("connected connectionId: ", id);
+        });
+        roomRTC.on("readyToCall", function (id) {
+            console.log("readyToCall, connectionId: ", id);
+            if (room) {
+                roomRTC.joinRoom(room)
+                    .then(roomData => {
+                        console.log("joinRoom ok: ", roomData);
+                    })
+                    .catch(err => {
+                        console.error("joinRoom error: ", err);
+                    });
+            }
+        });
+    </script>
+</body>
+
+</html>
