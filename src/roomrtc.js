@@ -50,12 +50,19 @@ module.exports = class RoomRTC extends EventEmitter {
 
     }
 
+    /**
+     * Verify connection ready then emit the event
+     */
     verifyReady() {
         if (this.connectionReady) {
             this.emit("readyToCall", this.connectionId);
         }
     }
 
+    /**
+     * join to exists room
+     * @return roomData(clients, number of participants)
+     */
     joinRoom(name) {
         if (!name) return Promise.reject("No room to join");
         // set name of the room wanna join
@@ -72,6 +79,27 @@ module.exports = class RoomRTC extends EventEmitter {
                 }
             });
         });
+    }
+
+    /**
+     * Create a new room
+     * @return name of the room
+     */
+    createRoom(name) {
+        if (!name) return Promise.reject("No room to create");
+        // send command to create a room
+        return new Promise((resolve, reject) => {
+            this.connection.emit('create', name, (err, roomName) => {
+                if (err) {
+                    this.emit("error", err);
+                } else {
+                    this.roomName = roomName;
+                    this.emit("roomCreated", roomName);
+                    return resolve(roomName);
+                }
+            });
+        });
+        
     }
 
     /**
