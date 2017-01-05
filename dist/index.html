@@ -1,34 +1,47 @@
 <!DOCTYPE html>
-<html>
+<html ng-app="demo">
 
 <head>
     <meta charset="utf-8">
     <meta name="description" content="RoomRTC dev tests">
     <title>RoomRTC dev tests</title>
-</head>
-
-<body>
-    <h1>Load RoomRTC API, ...</h1>
+    <!-- load cdnjs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.9/angular.js"></script>
     <script src="/roomrtc.bundle.js"></script>
     <script type="text/javascript">
-        var room = location.search && location.search.split('?')[1];
-        var roomRTC = new RoomRTC();
-        roomRTC.on("connected", function (id) {
-            console.log("connected connectionId: ", id);
-        });
-        roomRTC.on("readyToCall", function (id) {
-            console.log("readyToCall, connectionId: ", id);
-            if (room) {
-                roomRTC.joinRoom(room)
-                    .then(roomData => {
-                        console.log("joinRoom ok: ", roomData);
-                    })
-                    .catch(err => {
-                        console.error("joinRoom error: ", err);
-                    });
-            }
-        });
+        angular.module("demo", [])
+            .controller("roomController", function ($scope, $timeout) {
+                var room = location.search && location.search.split('?')[1];
+                var roomRTC = new RoomRTC();
+                roomRTC.on("connected", function (id) {
+                    console.log("connected connectionId: ", id);
+                });
+                roomRTC.on("readyToCall", function (id) {
+                    console.log("readyToCall, connectionId: ", id);
+                    if (room) {
+                        roomRTC.joinRoom(room)
+                            .then(roomData => {
+                                console.log("joinRoom ok: ", roomData);
+                                $timeout(function(){
+                                    $scope.clients = roomData.clients;
+                                });
+                            })
+                            .catch(err => {
+                                console.error("joinRoom error: ", err);
+                            });
+                    }
+                });
+            });
     </script>
+</head>
+
+<body ng-controller="roomController">
+    <h1>Load RoomRTC API, ...</h1>
+    <p>Display list clients</p>
+    {{ clients }}
+    <ul>
+        <li ng-repeat="(id, client) in clients">{{ $index + 1 }}: [{{ id }},{{ client.name }}]</li>
+    </ul>
 </body>
 
 </html>

@@ -58,12 +58,12 @@ module.exports = class RoomRTC extends EventEmitter {
         this.roomName = name;
         return new Promise((resolve, reject) => {
             this.connection.emit("join", name, (err, roomData) => {
-                this.logger.info("join callback: ", err, roomData);
+                this.logger.debug("join callback: ", err, roomData);
                 if (err) {
                     this.emit("error", err);
                     return reject(err);
                 } else {
-                    this.emit("joinedRoom", name);
+                    this.emit("roomJoined", name);
                     return resolve(roomData);
                 }
             });
