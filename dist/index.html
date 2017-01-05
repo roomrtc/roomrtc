@@ -38,7 +38,7 @@
 <body ng-controller="roomController">
     <h1>Load RoomRTC API, ...</h1>
     <p>Display list clients</p>
-    {{ clients }}
+
     <ul>
         <li ng-repeat="(id, client) in clients">{{ $index + 1 }}: [{{ id }},{{ client.name }}]</li>
     </ul>
