@@ -18,10 +18,14 @@ module.exports = class RoomRTC extends EventEmitter {
         this.config = {
             url: "/",
             media: {
-                video: true,
                 audio: true,
+                video: true,
                 data: false,
                 screen: false
+            },
+            mediaConstraints: {
+                audio: true,
+                video: true
             },
             peerMedia: {
                 offerToReceiveVideo: true,
@@ -70,4 +74,30 @@ module.exports = class RoomRTC extends EventEmitter {
         });
     }
 
+    /**
+     * Request to access a local camera and microphone
+     * @return: a promise handle
+     */
+    initMediaSource(mediaConstraints, devName) {
+        this.logger.debug("Requesting local media ...");
+
+        let dev = devName || "default";
+        let constrains = mediaConstraints || this.config.mediaConstraints;
+        return navigator.mediaDevices.getUserMedia(constrains);
+    }
+
+    /**
+     * utils to get, revoke a stream as url
+     * @return: blobUrl
+     */
+    getStreamAsUrl(stream) {
+        return URL.createObjectURL(stream);
+    }
+
+    /**
+     * revokeObjectURL
+     */
+    revokeObjectURL(url) {
+        URL.revokeObjectURL(url);
+    }
 }
