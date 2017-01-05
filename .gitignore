@@ -118,3 +118,6 @@ nbproject
 .idea
 .node_history
 .vscode
+
+# Dev files
+roomrtc.bundle.js

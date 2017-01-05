@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html ng-app="demo">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="RoomRTC dev tests">
+    <title>RoomRTC dev tests</title>
+    <!-- load cdnjs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.9/angular.js"></script>
+    <script src="/roomrtc.bundle.js"></script>
+    <script type="text/javascript">
+        angular.module("demo", [])
+            .controller("roomController", function ($scope, $timeout, $sce) {
+                var room = location.search && location.search.split('?')[1];
+                var roomRTC = new RoomRTC();
+                roomRTC.on("connected", function (id) {
+                    console.log("connected connectionId: ", id);
+                });
+                roomRTC.on("readyToCall", function (id) {
+                    console.log("readyToCall, connectionId: ", id);
+                    if (room) {
+                        roomRTC.joinRoom(room)
+                            .then(roomData => {
+                                console.log("joinRoom ok: ", roomData);
+                                $timeout(function () {
+                                    $scope.clients = roomData.clients;
+                                });
+                                return roomRTC.initMediaSource();
+                            })
+                            .then(stream => {
+                                var streamUrl = roomRTC.getStreamAsUrl(stream);
+                                $timeout(function () {
+                                    $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
+                                });
+                            })
+                            .catch(err => {
+                                console.error("joinRoom error: ", err);
+                            });
+                    }
+                });
+            });
+    </script>
+</head>
+
+<body ng-controller="roomController">
+    <h1>Load RoomRTC API, ...</h1>
+    <video id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
+    <p>Display list clients</p>
+    <ul>
+        <li ng-repeat="(id, client) in clients">{{ $index + 1 }}: [{{ id }},{{ client.name }}]</li>
+    </ul>
+</body>
+
+</html>

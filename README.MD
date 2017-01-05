@@ -15,6 +15,11 @@ Documentation
 ==============
 All documentation can be found within [the docs folder](./docs/).
 
+Run demo: 
+
+* Change dir: `cd node_modules/roomrtc`
+* Start server: `npm run demo`
+* Open browser: `http://localhost:8123/?myroom`
 
 License
 ========
