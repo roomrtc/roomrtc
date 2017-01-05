@@ -10,7 +10,7 @@
     <script src="/roomrtc.bundle.js"></script>
     <script type="text/javascript">
         angular.module("demo", [])
-            .controller("roomController", function ($scope, $timeout) {
+            .controller("roomController", function ($scope, $timeout, $sce) {
                 var room = location.search && location.search.split('?')[1];
                 var roomRTC = new RoomRTC();
                 roomRTC.on("connected", function (id) {
@@ -22,8 +22,15 @@
                         roomRTC.joinRoom(room)
                             .then(roomData => {
                                 console.log("joinRoom ok: ", roomData);
-                                $timeout(function(){
+                                $timeout(function () {
                                     $scope.clients = roomData.clients;
+                                });
+                                return roomRTC.initMediaSource();
+                            })
+                            .then(stream => {
+                                var streamUrl = roomRTC.getStreamAsUrl(stream);
+                                $timeout(function () {
+                                    $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
                                 });
                             })
                             .catch(err => {
@@ -37,8 +44,8 @@
 
 <body ng-controller="roomController">
     <h1>Load RoomRTC API, ...</h1>
+    <video id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
     <p>Display list clients</p>
-
     <ul>
         <li ng-repeat="(id, client) in clients">{{ $index + 1 }}: [{{ id }},{{ client.name }}]</li>
     </ul>
