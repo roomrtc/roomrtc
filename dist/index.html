@@ -5,55 +5,69 @@
     <meta charset="utf-8">
     <meta name="description" content="RoomRTC dev tests">
     <title>RoomRTC dev tests</title>
-    <!-- load cdnjs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.9/angular.js"></script>
+    <!-- load appcss -->
+    <link href="bootstrap-v3.3.7.css" rel="stylesheet" type="text/css">
+    <!-- load appjs -->
+    <script src="angular-v1.4.9.js"></script>
     <script src="/roomrtc.bundle.js"></script>
     <script type="text/javascript">
         angular.module("demo", [])
             .controller("roomController", function ($scope, $timeout, $sce) {
-                var room = location.search && location.search.split('?')[1];
+                var room = $scope.room = (location.search && location.search.split('?')[1]) || "demo";
                 var roomRTC = new RoomRTC();
                 roomRTC.on("connected", function (id) {
                     console.log("connected connectionId: ", id);
                 });
                 roomRTC.on("readyToCall", function (id) {
                     console.log("readyToCall, connectionId: ", id);
-                    if (room) {
-                        roomRTC.joinRoom(room)
-                            .then(roomData => {
-                                console.log("joinRoom ok: ", roomData);
-                                $timeout(function () {
-                                    $scope.clients = roomData.clients;
-                                });
-                                return roomRTC.initMediaSource();
-                            })
-                            .then(stream => {
-                                var streamUrl = roomRTC.getStreamAsUrl(stream);
-                                $timeout(function () {
-                                    $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
-                                });
-                            })
-                            .catch(err => {
-                                console.error("joinRoom error: ", err);
+                    roomRTC.initMediaSource()
+                        .then(stream => {
+                            var streamUrl = roomRTC.getStreamAsUrl(stream);
+                            $timeout(function () {
+                                $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
                             });
-                    }
+                            return roomRTC.joinRoom(room);
+                        })
+                        .then(roomData => {
+                            console.log("joinRoom ok: ", roomData);
+                            $timeout(function () {
+                                $scope.clients = roomData.clients;
+                            });
+                            return roomData.clients;
+                        })
+                        .catch(err => {
+                            console.error("joinRoom error: ", err);
+                        });
                 });
 
                 /**
                  * Setup control buttons
                  * */
-                $scope.stop = function() {
+                $scope.stop = function () {
                     roomRTC.stop();
+                }
+
+                $scope.start = function () {
+                    roomRTC.initMediaSource().then(stream => {
+                        var streamUrl = roomRTC.getStreamAsUrl(stream);
+                        $timeout(function () {
+                            $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
+                        });
+                    });
                 }
             });
     </script>
 </head>
 
 <body ng-controller="roomController">
-    <h1>Load RoomRTC API, ...</h1>
+    <h1>You are in room: <span ng-bind="room">...</span></h1>
     <video id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
     <div class="media-controls">
-        <input type="button" value="Stop" ng-click="stop()">
+        <input type="button" value="Stop" ng-click="stop()">&nbsp;
+        <input type="button" value="Start" ng-click="start()">
+    </div>
+    <div id="remotes">
+        <video ng-repeat="remoteVideo in remoteVideos" ng-src="{{remoteVideo}}"></video>
     </div>
     <p>Display list clients</p>
     <ul>
