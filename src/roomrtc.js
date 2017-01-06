@@ -15,6 +15,7 @@ module.exports = class RoomRTC extends EventEmitter {
         this.connection = null;
         this.connectionReady = false;
         this.roomName = null;
+        this.localStream = null;
         this.config = {
             url: "/",
             media: {
@@ -99,7 +100,7 @@ module.exports = class RoomRTC extends EventEmitter {
                 }
             });
         });
-        
+
     }
 
     /**
@@ -111,7 +112,46 @@ module.exports = class RoomRTC extends EventEmitter {
 
         let dev = devName || "default";
         let constrains = mediaConstraints || this.config.mediaConstraints;
-        return navigator.mediaDevices.getUserMedia(constrains);
+        return navigator.mediaDevices.getUserMedia(constrains)
+            .then(stream => {
+                // TODO: add event all to all tracks of the stream ?
+                this.localStream = stream;
+                return stream;
+            });
+    }
+
+    stop(stream) {
+        stream = stream || this.localStream;
+        this.stopStream(stream);
+    }
+
+    /**
+     * Replaces the deprecated MediaStream.stop method
+     */
+    stopStream(stream) {
+        if (!stream) return;
+        // stop audio tracks
+        for (let track of stream.getAudioTracks()) {
+            try {
+                track.stop();
+            } catch (err) {
+                this.logger.debug("stop audio track error:", err);
+            }
+        }
+        // stop video tracks
+        for (let track of stream.getVideoTracks()) {
+            try {
+                track.stop();
+            } catch (err) {
+                this.logger.debug("stop video track error:", err);
+            }
+        }
+        // stop stream
+        if (typeof stream.stop === 'function') {
+            try {
+                stream.stop();
+            } catch (err) {}
+        }
     }
 
     /**
