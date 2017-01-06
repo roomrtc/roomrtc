@@ -38,6 +38,13 @@
                             });
                     }
                 });
+
+                /**
+                 * Setup control buttons
+                 * */
+                $scope.stop = function() {
+                    roomRTC.stop();
+                }
             });
     </script>
 </head>
@@ -45,6 +52,9 @@
 <body ng-controller="roomController">
     <h1>Load RoomRTC API, ...</h1>
     <video id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
+    <div class="media-controls">
+        <input type="button" value="Stop" ng-click="stop()">
+    </div>
     <p>Display list clients</p>
     <ul>
         <li ng-repeat="(id, client) in clients">{{ $index + 1 }}: [{{ id }},{{ client.name }}]</li>
