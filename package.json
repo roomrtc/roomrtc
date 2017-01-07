@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/vunb/roomrtc#readme",
   "dependencies": {
+    "eventemitter2": "2.2.1",
     "promise": "7.1.1",
     "signaling": "0.9.x",
     "socket.io-client": "1.7.2",
