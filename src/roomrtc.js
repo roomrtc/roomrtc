@@ -1,9 +1,10 @@
-var events = require("events");
-var adapter = require("webrtc-adapter");
-var socketio = require("socket.io-client");
-var Promise = require("promise");
+const events = require("eventemitter2");
+const adapter = require("webrtc-adapter");
+const socketio = require("socket.io-client");
+const Promise = require("promise");
+const WebRTC = require("./webrtc");
 
-var EventEmitter = events.EventEmitter;
+const EventEmitter = events.EventEmitter2;
 
 module.exports = class RoomRTC extends EventEmitter {
 
@@ -24,11 +25,11 @@ module.exports = class RoomRTC extends EventEmitter {
                 data: false,
                 screen: false
             },
-            mediaConstraints: {
+            localMediaConstraints: {
                 audio: true,
                 video: true
             },
-            peerMedia: {
+            peerMediaConstraints: {
                 offerToReceiveVideo: true,
                 offerToReceiveAudio: true
             },
@@ -48,6 +49,51 @@ module.exports = class RoomRTC extends EventEmitter {
             this.emit("connected", this.connectionId);
             this.verifyReady();
         });
+
+        this.connection.on("message", msg => {
+            this.logger.debug("Receive message from singaling server:", msg);
+            if (msg.type == "offer") {
+                // create answer
+                let peer = this.webrtc.peers.find(p => p.sid == msg.sid);
+                if (!peer) {
+                    this.logger.debug("Creating a new peer connection to:", msg.from);
+                    peer = this.webrtc.createPeerConnection({
+                        id: msg.from,
+                        sid: msg.sid
+                    });
+                    this.emit("peerCreated", peer);
+                }
+                peer.processMessage(msg);
+            } else {
+                // process message
+                let peers = this.webrtc.peers;
+                peers.forEach(peer => {
+                    if (msg.sid) {
+                        if (peer.sid === msg.sid) {
+                            peer.processMessage(msg);
+                        }
+                    } else {
+                        peer.processMessage(msg);
+                    }
+                });
+            }
+        });
+
+        // init webrtc
+        this.webrtc = new WebRTC();
+        this.webrtc.on("peerStreamAdded", this.handlePeerStreamAdded.bind(this));
+        this.webrtc.on("peerStreamRemoved", this.handlePeerStreamRemoved.bind(this));
+        this.webrtc.on("message", payload => {
+            this.logger.debug("send message command", payload);
+            this.connection.emit("message", payload);
+        });
+
+        // debug all webrtc events
+        this.webrtc.onAny((event, value) => {
+            this.emit.call(this, event, value);
+        })
+        // log all data to the console
+        this.onAny(this.logger.debug.bind(this.logger, "RoomRTC event:"));
 
     }
 
@@ -75,6 +121,17 @@ module.exports = class RoomRTC extends EventEmitter {
                     this.emit("error", err);
                     return reject(err);
                 } else {
+                    // try to call everyone in the room
+                    let clients = roomData.clients || [];
+                    for (let id in clients) {
+                        // let clientConstraints = clients[id];
+                        let peer = this.webrtc.createPeerConnection({
+                            id: id
+                        });
+                        this.emit("peerCreated", peer);
+                        peer.start();
+                    }
+
                     this.emit("roomJoined", name);
                     return resolve(roomData);
                 }
@@ -111,7 +168,7 @@ module.exports = class RoomRTC extends EventEmitter {
         this.logger.debug("Requesting local media ...");
 
         let dev = devName || "default";
-        let constrains = mediaConstraints || this.config.mediaConstraints;
+        let constrains = mediaConstraints || this.config.localMediaConstraints;
         return navigator.mediaDevices.getUserMedia(constrains)
             .then(stream => {
                 // TODO: add event all to all tracks of the stream ?
@@ -167,5 +224,17 @@ module.exports = class RoomRTC extends EventEmitter {
      */
     revokeObjectURL(url) {
         URL.revokeObjectURL(url);
+    }
+
+    /**
+     * handle streaming
+     */
+    handlePeerStreamAdded(peer) {
+        let stream = peer.stream;
+        this.emit("remoteStreamAdded", stream, peer);
+    }
+
+    handlePeerStreamRemoved(peer) {
+        this.emit("remoteStreamRemoved", peer);
     }
 }
