@@ -24,7 +24,7 @@ module.exports = class PeerConnection extends EventEmitter {
         this.parent = this.config.parent;
         this.localStream = null;
 
-        this.pc = this.createRTCPeerConnection(this.parent.peerConnectionConfig, constraints);
+        this.pc = this.createRTCPeerConnection(this.parent.config.peerConnectionConfig, this.parent.config.peerConnectionConstraints);
 
         // bind event to handle peer message
         this.getLocalStreams = this.pc.getLocalStreams.bind(this.pc);
