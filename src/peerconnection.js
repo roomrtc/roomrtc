@@ -11,8 +11,12 @@ module.exports = class PeerConnection extends EventEmitter {
         this.config = config || {};
         this.config.iceServers = this.config.iceServers || [];
         this.config.constraints = this.config.constraints || {
-            offerToReceiveAudio: 1,
-            offerToReceiveVideo: 1
+            // offerToReceiveAudio: 1,
+            // offerToReceiveVideo: 1
+            mandatory: {
+                OfferToReceiveAudio: true,
+                OfferToReceiveVideo: true
+            }
         }
 
         this.id = this.config.id;
@@ -20,7 +24,7 @@ module.exports = class PeerConnection extends EventEmitter {
         this.parent = this.config.parent;
         this.localStream = null;
 
-        this.pc = this.createRTCPeerConnection(config, constraints);
+        this.pc = this.createRTCPeerConnection(this.parent.peerConnectionConfig, constraints);
 
         // bind event to handle peer message
         this.getLocalStreams = this.pc.getLocalStreams.bind(this.pc);
@@ -104,9 +108,9 @@ module.exports = class PeerConnection extends EventEmitter {
     /**
      * Create sdp answer
      */
-    answer(constrains, callback) {
-        callback = callback || (() => 1);
-        var mediaConstraints = constrains || this.config.constrains;
+    answer(constraints, callback) {
+        callback = this._safeCallback(callback);
+        var mediaConstraints = constraints || this.config.constraints;
 
         if (this.pc.signalingState === 'closed') return callback("Signaling state is closed");
 
@@ -131,14 +135,48 @@ module.exports = class PeerConnection extends EventEmitter {
     }
 
     processMessage(msg) {
-        this.logger.warn("Not implemented");
+        this.logger.debug("Preparing proccess peer message", msg.type, msg);
 
         if (msg.type === "offer") {
-
+            this.processMsgOffer(msg.payload, err => {
+                if (!err) {
+                    this.answer(this.config.constraints, err => {
+                        if (err) {
+                            this.logger.error("Cannot create an answer message", err, msg);
+                        } else {
+                            this.logger.info("Sent the answer message to ", msg);
+                        }
+                    });
+                } else {
+                    this.logger.error("Cannot process msgOffer:", err);
+                }
+            });
         } else if (msg.type === "answer") {
-            
+            this.processMsgAnswer(msg.payload);
+        } else {
+            this.logger.warn("Unknow message", msg);
         }
 
+    }
+
+    processMsgOffer(msgOffer, callback) {
+        callback = this._safeCallback(callback);
+        let description = new RTCSessionDescription(msgOffer);
+        this.pc.setRemoteDescription(description, () => {
+            callback(null);
+        }, err => {
+            callback(err);
+        });
+    }
+
+    processMsgAnswer(msgAnswer, callback) {
+        callback = this._safeCallback(callback);
+        let description = new RTCSessionDescription(msgAnswer);
+        this.pc.setRemoteDescription(description, () => {
+            callback(null);
+        }, err => {
+            callback(err);
+        })
     }
 
     /**
@@ -153,6 +191,7 @@ module.exports = class PeerConnection extends EventEmitter {
      * Add localStream to the peer connection
      */
     addStream(stream) {
+        this.logger.debug("Got the stream!");
         this.localStream = stream;
         this.pc.addStream(stream);
     }
@@ -160,6 +199,10 @@ module.exports = class PeerConnection extends EventEmitter {
     /**
      * Internal methods
      */
+    _safeCallback(cb) {
+        return cb || (() => 1);
+    }
+
     _onIceCandidate(event) {
         if (event.candidate) {
             let iceCandidate = new RTCIceCandidate(event.candidate);

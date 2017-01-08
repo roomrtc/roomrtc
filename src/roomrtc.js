@@ -79,6 +79,11 @@ module.exports = class RoomRTC extends EventEmitter {
             }
         });
 
+        this.connection.on("iceservers", servers => {
+            this.logger.debug("Got iceservers info", servers);
+            // TODO: concat to peer connection
+        });
+
         // init webrtc
         this.webrtc = new WebRTC();
         this.webrtc.on("peerStreamAdded", this.handlePeerStreamAdded.bind(this));
