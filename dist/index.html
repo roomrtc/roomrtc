@@ -7,6 +7,7 @@
     <title>RoomRTC dev tests</title>
     <!-- load appcss -->
     <link href="bootstrap-v3.3.7.css" rel="stylesheet" type="text/css">
+    <link href="style.css" rel="stylesheet" type="text/css">
     <!-- load appjs -->
     <script src="angular-v1.4.9.js"></script>
     <script src="/roomrtc.bundle.js"></script>
@@ -73,7 +74,7 @@
 
 <body ng-controller="roomController">
     <h1>You are in room: <span ng-bind="room">...</span></h1>
-    <video id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
+    <video class="mirror" id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
     <div class="media-controls">
         <input type="button" value="Stop" ng-click="stop()">&nbsp;
         <input type="button" value="Start" ng-click="start()">

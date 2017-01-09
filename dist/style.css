@@ -1,0 +1,6 @@
+.mirror {
+    -o-transform: scaleX(-1);
+    -ms-transform: scaleX(-1);      /* IE 9 */
+    -webkit-transform: scaleX(-1);  /* Chrome, Safari, Opera */
+    -moz-transform: scaleX(-1);     /* Firefox */
+}
