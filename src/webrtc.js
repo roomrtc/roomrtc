@@ -30,6 +30,11 @@ module.exports = class WebRTC extends EventEmitter {
         this.peers = [];
     }
 
+    setPeerConnectionConfig(config, constraints) {
+        this.config.peerConnectionConfig = config;
+        this.config.peerConnectionConstraints = constraints;
+    }
+
     createPeerConnection(options) {
         options = options || {};
         options.parent = this;

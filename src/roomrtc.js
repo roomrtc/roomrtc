@@ -51,7 +51,7 @@ module.exports = class RoomRTC extends EventEmitter {
         });
 
         this.connection.on("message", msg => {
-            this.logger.debug("Receive message from singaling server:", msg);
+            // this.logger.debug("Receive message from singaling server:", msg);
             if (msg.type == "offer") {
                 // create answer
                 let peer = this.webrtc.peers.find(p => p.sid == msg.sid);
