@@ -56,6 +56,11 @@ module.exports = class PeerConnection extends EventEmitter {
             this.send("answer", answerMsg);
         });
 
+        // send candidateMsg
+        this.on("iceCandidate", candidate => {
+            this.send("iceCandidate", candidate);
+        });
+
     }
 
     /**
@@ -153,6 +158,8 @@ module.exports = class PeerConnection extends EventEmitter {
             });
         } else if (msg.type === "answer") {
             this.processMsgAnswer(msg.payload);
+        } else if (msg.type === "iceCandidate") {
+            this.processMsgCandidate(msg.payload);
         } else {
             this.logger.warn("Unknow message", msg);
         }
@@ -177,6 +184,21 @@ module.exports = class PeerConnection extends EventEmitter {
         }, err => {
             callback(err);
         })
+    }
+
+    processMsgCandidate(msgIce, callback) {
+        callback = this._safeCallback(callback);
+        // IPv6 candidates are only accepted with a= syntax in addIceCandidate
+        // https://bugs.chromium.org/p/webrtc/issues/detail?id=3669
+        if (msgIce.candidate && msgIce.candidate.candidate.indexOf("a=") !== 0) {
+            msgIce.candidate.candidate = "a=" + msgIce.candidate.candidate;
+        }
+
+        let iceCandidate = new RTCIceCandidate(msgIce.candidate);
+        this.pc.addIceCandidate(iceCandidate, () => {}, (err) => {
+            this.emit("error", err);
+        });
+        callback(null);
     }
 
     /**
@@ -205,10 +227,18 @@ module.exports = class PeerConnection extends EventEmitter {
 
     _onIceCandidate(event) {
         if (event.candidate) {
-            let iceCandidate = new RTCIceCandidate(event.candidate);
-            this.pc.addIceCandidate(iceCandidate);
-            this.logger.debug("Remote ICE candidate: ", event.candidate.candidate);
-            this.emit("ice", event);
+            let ice = event.candidate;
+            // let iceCandidate = new RTCIceCandidate(ice.candidate);
+            // this.pc.addIceCandidate(iceCandidate);
+            let iceCandidate = {
+                candidate: {
+                    candidate: ice.candidate,
+                    sdpMid: ice.sdpMid,
+                    sdpMLineIndex: ice.sdpMLineIndex
+                }
+            }
+            this.logger.debug("Got an ICE candidate: ", iceCandidate);
+            this.emit("iceCandidate", iceCandidate);
         } else {
             this.logger.debug("iceEnd_onIceCandidate", event);
             this.emit("iceEnd");
