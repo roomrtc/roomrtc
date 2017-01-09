@@ -68,6 +68,16 @@ module.exports = class PeerConnection extends EventEmitter {
                 this.logger.warn("Already have a remote stream");
             } else {
                 this.stream = event.stream;
+
+                for (let track of this.stream.getTracks()) {
+                    track.addEventListener("ended", () => {
+                        if (isAllTracksEnded(stream)) {
+                            this.logger.debug("stream ended, id:", this.id);
+                            this.end();
+                        }
+                    });
+                }
+
                 this.parent.emit("peerStreamAdded", this);
             }
         });
@@ -93,11 +103,20 @@ module.exports = class PeerConnection extends EventEmitter {
         this.offer(this.config.constraints);
     }
 
+    end() {
+        if (this.isClosed) return;
+
+        this.close();
+        this.isClosed = true;
+        this.parent.removePeerConnection(this);
+        this.parent.emit("peerStreamRemoved", this);
+    }
+
     /**
      * handle peer message
      */
     offer(constraints, callback) {
-        callback = callback || (() => 1);
+        callback = this._safeCallback(callback);
         var mediaConstraints = constraints || this.config.constraints;
         if (this.pc.signalingState === 'closed') return callback("Signaling state is closed");
 

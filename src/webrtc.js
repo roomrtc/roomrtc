@@ -31,14 +31,38 @@ module.exports = class WebRTC extends EventEmitter {
         this.localStreams = [];
     }
 
+    /**
+     *  Declare fields
+     */
+    get localStream() {
+        // get index 0
+        return this.localStreams.length > 0 ? this.localStreams[0] : null;
+    }
+
+    /**
+     * Private methods
+     */
+    _removeStream(stream) {
+        let index = this.localStreams.indexOf(stream);
+        if (index > -1) {
+            this.localStream.splice(index, 1);
+        }
+    }
+
     setPeerConnectionConfig(config, constraints) {
         this.config.peerConnectionConfig = config;
         this.config.peerConnectionConstraints = constraints;
     }
 
-    get localStream() {
-        // get index 0
-        return this.localStreams.length > 0 ? this.localStreams[0] : null;
+    isAllTracksEnded(stream) {
+        let isEnded = true;
+        for (let track of stream.getTracks()) {
+            if (track.readyState !== "ended") {
+                isEnded = false;
+                break;
+            }
+        }
+        return isEnded;
     }
 
     addLocalStream(stream) {
@@ -51,6 +75,22 @@ module.exports = class WebRTC extends EventEmitter {
         let peer = new PeerConnection(options);
         this.peers.push(peer);
         return peer;
+    }
+
+    removePeerConnection(stream) {
+        let index = this.peers.indexOf(stream);
+        if (index) {
+            this.peers.splice(index, 1);
+        }
+    }
+
+    removePeerConnectionById(id) {
+        this.peers.some(peer => {
+            if (peer.id == id) {
+                peer.end();
+                return true;
+            }
+        });
     }
 
 }

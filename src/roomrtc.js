@@ -26,7 +26,7 @@ module.exports = class RoomRTC extends EventEmitter {
                 screen: false
             },
             localMediaConstraints: {
-                audio: true,
+                audio: false,
                 video: true
             },
             peerMediaConstraints: {
@@ -78,6 +78,11 @@ module.exports = class RoomRTC extends EventEmitter {
                 });
             }
         });
+
+        this.connection.on("remove", info => {
+            this.logger.info("removePeerConnectionById", info);
+            this.webrtc.removePeerConnectionById(info.id);
+        })
 
         this.connection.on("iceservers", servers => {
             this.logger.debug("Got iceservers info", servers);
