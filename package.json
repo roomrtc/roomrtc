@@ -1,6 +1,6 @@
 {
   "name": "roomrtc",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "RoomRTC enables quick development of webRTC",
   "main": "index.js",
   "scripts": {
@@ -13,10 +13,9 @@
     "url": "git@github.com:Vunb/roomrtc.git"
   },
   "keywords": [
-    "rtc",
-    "room",
-    "webRTC",
-    "RoomRTC"
+    "signaling",
+    "roomrtc",
+    "webrtc"
   ],
   "author": "Vunb",
   "license": "ISC",

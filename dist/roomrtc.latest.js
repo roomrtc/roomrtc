@@ -4042,308 +4042,728 @@ module.exports = Object.keys || function keys (obj){
 };
 
 },{}],26:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
+/*!
+ * EventEmitter2
+ * https://github.com/hij1nx/EventEmitter2
+ *
+ * Copyright (c) 2013 hij1nx
+ * Licensed under the MIT license.
+ */
+;!function(undefined) {
 
-function EventEmitter() {
-  this._events = this._events || {};
-  this._maxListeners = this._maxListeners || undefined;
-}
-module.exports = EventEmitter;
+  var isArray = Array.isArray ? Array.isArray : function _isArray(obj) {
+    return Object.prototype.toString.call(obj) === "[object Array]";
+  };
+  var defaultMaxListeners = 10;
 
-// Backwards-compat with node 0.10.x
-EventEmitter.EventEmitter = EventEmitter;
-
-EventEmitter.prototype._events = undefined;
-EventEmitter.prototype._maxListeners = undefined;
-
-// By default EventEmitters will print a warning if more than 10 listeners are
-// added to it. This is a useful default which helps finding memory leaks.
-EventEmitter.defaultMaxListeners = 10;
-
-// Obviously not all Emitters should be limited to 10. This function allows
-// that to be increased. Set to zero for unlimited.
-EventEmitter.prototype.setMaxListeners = function(n) {
-  if (!isNumber(n) || n < 0 || isNaN(n))
-    throw TypeError('n must be a positive number');
-  this._maxListeners = n;
-  return this;
-};
-
-EventEmitter.prototype.emit = function(type) {
-  var er, handler, len, args, i, listeners;
-
-  if (!this._events)
+  function init() {
     this._events = {};
-
-  // If there is no 'error' event listener then throw.
-  if (type === 'error') {
-    if (!this._events.error ||
-        (isObject(this._events.error) && !this._events.error.length)) {
-      er = arguments[1];
-      if (er instanceof Error) {
-        throw er; // Unhandled 'error' event
-      } else {
-        // At least give some kind of context to the user
-        var err = new Error('Uncaught, unspecified "error" event. (' + er + ')');
-        err.context = er;
-        throw err;
-      }
+    if (this._conf) {
+      configure.call(this, this._conf);
     }
   }
 
-  handler = this._events[type];
+  function configure(conf) {
+    if (conf) {
+      this._conf = conf;
 
-  if (isUndefined(handler))
-    return false;
+      conf.delimiter && (this.delimiter = conf.delimiter);
+      this._events.maxListeners = conf.maxListeners !== undefined ? conf.maxListeners : defaultMaxListeners;
+      conf.wildcard && (this.wildcard = conf.wildcard);
+      conf.newListener && (this.newListener = conf.newListener);
+      conf.verboseMemoryLeak && (this.verboseMemoryLeak = conf.verboseMemoryLeak);
 
-  if (isFunction(handler)) {
-    switch (arguments.length) {
-      // fast cases
+      if (this.wildcard) {
+        this.listenerTree = {};
+      }
+    } else {
+      this._events.maxListeners = defaultMaxListeners;
+    }
+  }
+
+  function logPossibleMemoryLeak(count, eventName) {
+    var errorMsg = '(node) warning: possible EventEmitter memory ' +
+        'leak detected. %d listeners added. ' +
+        'Use emitter.setMaxListeners() to increase limit.';
+
+    if(this.verboseMemoryLeak){
+      errorMsg += ' Event name: %s.';
+      console.error(errorMsg, count, eventName);
+    } else {
+      console.error(errorMsg, count);
+    }
+
+    if (console.trace){
+      console.trace();
+    }
+  }
+
+  function EventEmitter(conf) {
+    this._events = {};
+    this.newListener = false;
+    this.verboseMemoryLeak = false;
+    configure.call(this, conf);
+  }
+  EventEmitter.EventEmitter2 = EventEmitter; // backwards compatibility for exporting EventEmitter property
+
+  //
+  // Attention, function return type now is array, always !
+  // It has zero elements if no any matches found and one or more
+  // elements (leafs) if there are matches
+  //
+  function searchListenerTree(handlers, type, tree, i) {
+    if (!tree) {
+      return [];
+    }
+    var listeners=[], leaf, len, branch, xTree, xxTree, isolatedBranch, endReached,
+        typeLength = type.length, currentType = type[i], nextType = type[i+1];
+    if (i === typeLength && tree._listeners) {
+      //
+      // If at the end of the event(s) list and the tree has listeners
+      // invoke those listeners.
+      //
+      if (typeof tree._listeners === 'function') {
+        handlers && handlers.push(tree._listeners);
+        return [tree];
+      } else {
+        for (leaf = 0, len = tree._listeners.length; leaf < len; leaf++) {
+          handlers && handlers.push(tree._listeners[leaf]);
+        }
+        return [tree];
+      }
+    }
+
+    if ((currentType === '*' || currentType === '**') || tree[currentType]) {
+      //
+      // If the event emitted is '*' at this part
+      // or there is a concrete match at this patch
+      //
+      if (currentType === '*') {
+        for (branch in tree) {
+          if (branch !== '_listeners' && tree.hasOwnProperty(branch)) {
+            listeners = listeners.concat(searchListenerTree(handlers, type, tree[branch], i+1));
+          }
+        }
+        return listeners;
+      } else if(currentType === '**') {
+        endReached = (i+1 === typeLength || (i+2 === typeLength && nextType === '*'));
+        if(endReached && tree._listeners) {
+          // The next element has a _listeners, add it to the handlers.
+          listeners = listeners.concat(searchListenerTree(handlers, type, tree, typeLength));
+        }
+
+        for (branch in tree) {
+          if (branch !== '_listeners' && tree.hasOwnProperty(branch)) {
+            if(branch === '*' || branch === '**') {
+              if(tree[branch]._listeners && !endReached) {
+                listeners = listeners.concat(searchListenerTree(handlers, type, tree[branch], typeLength));
+              }
+              listeners = listeners.concat(searchListenerTree(handlers, type, tree[branch], i));
+            } else if(branch === nextType) {
+              listeners = listeners.concat(searchListenerTree(handlers, type, tree[branch], i+2));
+            } else {
+              // No match on this one, shift into the tree but not in the type array.
+              listeners = listeners.concat(searchListenerTree(handlers, type, tree[branch], i));
+            }
+          }
+        }
+        return listeners;
+      }
+
+      listeners = listeners.concat(searchListenerTree(handlers, type, tree[currentType], i+1));
+    }
+
+    xTree = tree['*'];
+    if (xTree) {
+      //
+      // If the listener tree will allow any match for this part,
+      // then recursively explore all branches of the tree
+      //
+      searchListenerTree(handlers, type, xTree, i+1);
+    }
+
+    xxTree = tree['**'];
+    if(xxTree) {
+      if(i < typeLength) {
+        if(xxTree._listeners) {
+          // If we have a listener on a '**', it will catch all, so add its handler.
+          searchListenerTree(handlers, type, xxTree, typeLength);
+        }
+
+        // Build arrays of matching next branches and others.
+        for(branch in xxTree) {
+          if(branch !== '_listeners' && xxTree.hasOwnProperty(branch)) {
+            if(branch === nextType) {
+              // We know the next element will match, so jump twice.
+              searchListenerTree(handlers, type, xxTree[branch], i+2);
+            } else if(branch === currentType) {
+              // Current node matches, move into the tree.
+              searchListenerTree(handlers, type, xxTree[branch], i+1);
+            } else {
+              isolatedBranch = {};
+              isolatedBranch[branch] = xxTree[branch];
+              searchListenerTree(handlers, type, { '**': isolatedBranch }, i+1);
+            }
+          }
+        }
+      } else if(xxTree._listeners) {
+        // We have reached the end and still on a '**'
+        searchListenerTree(handlers, type, xxTree, typeLength);
+      } else if(xxTree['*'] && xxTree['*']._listeners) {
+        searchListenerTree(handlers, type, xxTree['*'], typeLength);
+      }
+    }
+
+    return listeners;
+  }
+
+  function growListenerTree(type, listener) {
+
+    type = typeof type === 'string' ? type.split(this.delimiter) : type.slice();
+
+    //
+    // Looks for two consecutive '**', if so, don't add the event at all.
+    //
+    for(var i = 0, len = type.length; i+1 < len; i++) {
+      if(type[i] === '**' && type[i+1] === '**') {
+        return;
+      }
+    }
+
+    var tree = this.listenerTree;
+    var name = type.shift();
+
+    while (name !== undefined) {
+
+      if (!tree[name]) {
+        tree[name] = {};
+      }
+
+      tree = tree[name];
+
+      if (type.length === 0) {
+
+        if (!tree._listeners) {
+          tree._listeners = listener;
+        }
+        else {
+          if (typeof tree._listeners === 'function') {
+            tree._listeners = [tree._listeners];
+          }
+
+          tree._listeners.push(listener);
+
+          if (
+            !tree._listeners.warned &&
+            this._events.maxListeners > 0 &&
+            tree._listeners.length > this._events.maxListeners
+          ) {
+            tree._listeners.warned = true;
+            logPossibleMemoryLeak.call(this, tree._listeners.length, name);
+          }
+        }
+        return true;
+      }
+      name = type.shift();
+    }
+    return true;
+  }
+
+  // By default EventEmitters will print a warning if more than
+  // 10 listeners are added to it. This is a useful default which
+  // helps finding memory leaks.
+  //
+  // Obviously not all Emitters should be limited to 10. This function allows
+  // that to be increased. Set to zero for unlimited.
+
+  EventEmitter.prototype.delimiter = '.';
+
+  EventEmitter.prototype.setMaxListeners = function(n) {
+    if (n !== undefined) {
+      this._events || init.call(this);
+      this._events.maxListeners = n;
+      if (!this._conf) this._conf = {};
+      this._conf.maxListeners = n;
+    }
+  };
+
+  EventEmitter.prototype.event = '';
+
+  EventEmitter.prototype.once = function(event, fn) {
+    this.many(event, 1, fn);
+    return this;
+  };
+
+  EventEmitter.prototype.many = function(event, ttl, fn) {
+    var self = this;
+
+    if (typeof fn !== 'function') {
+      throw new Error('many only accepts instances of Function');
+    }
+
+    function listener() {
+      if (--ttl === 0) {
+        self.off(event, listener);
+      }
+      fn.apply(this, arguments);
+    }
+
+    listener._origin = fn;
+
+    this.on(event, listener);
+
+    return self;
+  };
+
+  EventEmitter.prototype.emit = function() {
+
+    this._events || init.call(this);
+
+    var type = arguments[0];
+
+    if (type === 'newListener' && !this.newListener) {
+      if (!this._events.newListener) {
+        return false;
+      }
+    }
+
+    var al = arguments.length;
+    var args,l,i,j;
+    var handler;
+
+    if (this._all && this._all.length) {
+      handler = this._all.slice();
+      if (al > 3) {
+        args = new Array(al);
+        for (j = 0; j < al; j++) args[j] = arguments[j];
+      }
+
+      for (i = 0, l = handler.length; i < l; i++) {
+        this.event = type;
+        switch (al) {
+        case 1:
+          handler[i].call(this, type);
+          break;
+        case 2:
+          handler[i].call(this, type, arguments[1]);
+          break;
+        case 3:
+          handler[i].call(this, type, arguments[1], arguments[2]);
+          break;
+        default:
+          handler[i].apply(this, args);
+        }
+      }
+    }
+
+    if (this.wildcard) {
+      handler = [];
+      var ns = typeof type === 'string' ? type.split(this.delimiter) : type.slice();
+      searchListenerTree.call(this, handler, ns, this.listenerTree, 0);
+    } else {
+      handler = this._events[type];
+      if (typeof handler === 'function') {
+        this.event = type;
+        switch (al) {
+        case 1:
+          handler.call(this);
+          break;
+        case 2:
+          handler.call(this, arguments[1]);
+          break;
+        case 3:
+          handler.call(this, arguments[1], arguments[2]);
+          break;
+        default:
+          args = new Array(al - 1);
+          for (j = 1; j < al; j++) args[j - 1] = arguments[j];
+          handler.apply(this, args);
+        }
+        return true;
+      } else if (handler) {
+        // need to make copy of handlers because list can change in the middle
+        // of emit call
+        handler = handler.slice();
+      }
+    }
+
+    if (handler && handler.length) {
+      if (al > 3) {
+        args = new Array(al - 1);
+        for (j = 1; j < al; j++) args[j - 1] = arguments[j];
+      }
+      for (i = 0, l = handler.length; i < l; i++) {
+        this.event = type;
+        switch (al) {
+        case 1:
+          handler[i].call(this);
+          break;
+        case 2:
+          handler[i].call(this, arguments[1]);
+          break;
+        case 3:
+          handler[i].call(this, arguments[1], arguments[2]);
+          break;
+        default:
+          handler[i].apply(this, args);
+        }
+      }
+      return true;
+    } else if (!this._all && type === 'error') {
+      if (arguments[1] instanceof Error) {
+        throw arguments[1]; // Unhandled 'error' event
+      } else {
+        throw new Error("Uncaught, unspecified 'error' event.");
+      }
+      return false;
+    }
+
+    return !!this._all;
+  };
+
+  EventEmitter.prototype.emitAsync = function() {
+
+    this._events || init.call(this);
+
+    var type = arguments[0];
+
+    if (type === 'newListener' && !this.newListener) {
+        if (!this._events.newListener) { return Promise.resolve([false]); }
+    }
+
+    var promises= [];
+
+    var al = arguments.length;
+    var args,l,i,j;
+    var handler;
+
+    if (this._all) {
+      if (al > 3) {
+        args = new Array(al);
+        for (j = 1; j < al; j++) args[j] = arguments[j];
+      }
+      for (i = 0, l = this._all.length; i < l; i++) {
+        this.event = type;
+        switch (al) {
+        case 1:
+          promises.push(this._all[i].call(this, type));
+          break;
+        case 2:
+          promises.push(this._all[i].call(this, type, arguments[1]));
+          break;
+        case 3:
+          promises.push(this._all[i].call(this, type, arguments[1], arguments[2]));
+          break;
+        default:
+          promises.push(this._all[i].apply(this, args));
+        }
+      }
+    }
+
+    if (this.wildcard) {
+      handler = [];
+      var ns = typeof type === 'string' ? type.split(this.delimiter) : type.slice();
+      searchListenerTree.call(this, handler, ns, this.listenerTree, 0);
+    } else {
+      handler = this._events[type];
+    }
+
+    if (typeof handler === 'function') {
+      this.event = type;
+      switch (al) {
       case 1:
-        handler.call(this);
+        promises.push(handler.call(this));
         break;
       case 2:
-        handler.call(this, arguments[1]);
+        promises.push(handler.call(this, arguments[1]));
         break;
       case 3:
-        handler.call(this, arguments[1], arguments[2]);
+        promises.push(handler.call(this, arguments[1], arguments[2]));
         break;
-      // slower
       default:
-        args = Array.prototype.slice.call(arguments, 1);
-        handler.apply(this, args);
-    }
-  } else if (isObject(handler)) {
-    args = Array.prototype.slice.call(arguments, 1);
-    listeners = handler.slice();
-    len = listeners.length;
-    for (i = 0; i < len; i++)
-      listeners[i].apply(this, args);
-  }
-
-  return true;
-};
-
-EventEmitter.prototype.addListener = function(type, listener) {
-  var m;
-
-  if (!isFunction(listener))
-    throw TypeError('listener must be a function');
-
-  if (!this._events)
-    this._events = {};
-
-  // To avoid recursion in the case that type === "newListener"! Before
-  // adding it to the listeners, first emit "newListener".
-  if (this._events.newListener)
-    this.emit('newListener', type,
-              isFunction(listener.listener) ?
-              listener.listener : listener);
-
-  if (!this._events[type])
-    // Optimize the case of one listener. Don't need the extra array object.
-    this._events[type] = listener;
-  else if (isObject(this._events[type]))
-    // If we've already got an array, just append.
-    this._events[type].push(listener);
-  else
-    // Adding the second element, need to change to array.
-    this._events[type] = [this._events[type], listener];
-
-  // Check for listener leak
-  if (isObject(this._events[type]) && !this._events[type].warned) {
-    if (!isUndefined(this._maxListeners)) {
-      m = this._maxListeners;
-    } else {
-      m = EventEmitter.defaultMaxListeners;
-    }
-
-    if (m && m > 0 && this._events[type].length > m) {
-      this._events[type].warned = true;
-      console.error('(node) warning: possible EventEmitter memory ' +
-                    'leak detected. %d listeners added. ' +
-                    'Use emitter.setMaxListeners() to increase limit.',
-                    this._events[type].length);
-      if (typeof console.trace === 'function') {
-        // not supported in IE 10
-        console.trace();
+        args = new Array(al - 1);
+        for (j = 1; j < al; j++) args[j - 1] = arguments[j];
+        promises.push(handler.apply(this, args));
       }
-    }
-  }
-
-  return this;
-};
-
-EventEmitter.prototype.on = EventEmitter.prototype.addListener;
-
-EventEmitter.prototype.once = function(type, listener) {
-  if (!isFunction(listener))
-    throw TypeError('listener must be a function');
-
-  var fired = false;
-
-  function g() {
-    this.removeListener(type, g);
-
-    if (!fired) {
-      fired = true;
-      listener.apply(this, arguments);
-    }
-  }
-
-  g.listener = listener;
-  this.on(type, g);
-
-  return this;
-};
-
-// emits a 'removeListener' event iff the listener was removed
-EventEmitter.prototype.removeListener = function(type, listener) {
-  var list, position, length, i;
-
-  if (!isFunction(listener))
-    throw TypeError('listener must be a function');
-
-  if (!this._events || !this._events[type])
-    return this;
-
-  list = this._events[type];
-  length = list.length;
-  position = -1;
-
-  if (list === listener ||
-      (isFunction(list.listener) && list.listener === listener)) {
-    delete this._events[type];
-    if (this._events.removeListener)
-      this.emit('removeListener', type, listener);
-
-  } else if (isObject(list)) {
-    for (i = length; i-- > 0;) {
-      if (list[i] === listener ||
-          (list[i].listener && list[i].listener === listener)) {
-        position = i;
-        break;
+    } else if (handler && handler.length) {
+      if (al > 3) {
+        args = new Array(al - 1);
+        for (j = 1; j < al; j++) args[j - 1] = arguments[j];
+      }
+      for (i = 0, l = handler.length; i < l; i++) {
+        this.event = type;
+        switch (al) {
+        case 1:
+          promises.push(handler[i].call(this));
+          break;
+        case 2:
+          promises.push(handler[i].call(this, arguments[1]));
+          break;
+        case 3:
+          promises.push(handler[i].call(this, arguments[1], arguments[2]));
+          break;
+        default:
+          promises.push(handler[i].apply(this, args));
+        }
+      }
+    } else if (!this._all && type === 'error') {
+      if (arguments[1] instanceof Error) {
+        return Promise.reject(arguments[1]); // Unhandled 'error' event
+      } else {
+        return Promise.reject("Uncaught, unspecified 'error' event.");
       }
     }
 
-    if (position < 0)
+    return Promise.all(promises);
+  };
+
+  EventEmitter.prototype.on = function(type, listener) {
+    if (typeof type === 'function') {
+      this.onAny(type);
       return this;
+    }
 
-    if (list.length === 1) {
-      list.length = 0;
-      delete this._events[type];
+    if (typeof listener !== 'function') {
+      throw new Error('on only accepts instances of Function');
+    }
+    this._events || init.call(this);
+
+    // To avoid recursion in the case that type == "newListeners"! Before
+    // adding it to the listeners, first emit "newListeners".
+    this.emit('newListener', type, listener);
+
+    if (this.wildcard) {
+      growListenerTree.call(this, type, listener);
+      return this;
+    }
+
+    if (!this._events[type]) {
+      // Optimize the case of one listener. Don't need the extra array object.
+      this._events[type] = listener;
+    }
+    else {
+      if (typeof this._events[type] === 'function') {
+        // Change to array.
+        this._events[type] = [this._events[type]];
+      }
+
+      // If we've already got an array, just append.
+      this._events[type].push(listener);
+
+      // Check for listener leak
+      if (
+        !this._events[type].warned &&
+        this._events.maxListeners > 0 &&
+        this._events[type].length > this._events.maxListeners
+      ) {
+        this._events[type].warned = true;
+        logPossibleMemoryLeak.call(this, this._events[type].length, type);
+      }
+    }
+
+    return this;
+  };
+
+  EventEmitter.prototype.onAny = function(fn) {
+    if (typeof fn !== 'function') {
+      throw new Error('onAny only accepts instances of Function');
+    }
+
+    if (!this._all) {
+      this._all = [];
+    }
+
+    // Add the function to the event listener collection.
+    this._all.push(fn);
+    return this;
+  };
+
+  EventEmitter.prototype.addListener = EventEmitter.prototype.on;
+
+  EventEmitter.prototype.off = function(type, listener) {
+    if (typeof listener !== 'function') {
+      throw new Error('removeListener only takes instances of Function');
+    }
+
+    var handlers,leafs=[];
+
+    if(this.wildcard) {
+      var ns = typeof type === 'string' ? type.split(this.delimiter) : type.slice();
+      leafs = searchListenerTree.call(this, null, ns, this.listenerTree, 0);
+    }
+    else {
+      // does not use listeners(), so no side effect of creating _events[type]
+      if (!this._events[type]) return this;
+      handlers = this._events[type];
+      leafs.push({_listeners:handlers});
+    }
+
+    for (var iLeaf=0; iLeaf<leafs.length; iLeaf++) {
+      var leaf = leafs[iLeaf];
+      handlers = leaf._listeners;
+      if (isArray(handlers)) {
+
+        var position = -1;
+
+        for (var i = 0, length = handlers.length; i < length; i++) {
+          if (handlers[i] === listener ||
+            (handlers[i].listener && handlers[i].listener === listener) ||
+            (handlers[i]._origin && handlers[i]._origin === listener)) {
+            position = i;
+            break;
+          }
+        }
+
+        if (position < 0) {
+          continue;
+        }
+
+        if(this.wildcard) {
+          leaf._listeners.splice(position, 1);
+        }
+        else {
+          this._events[type].splice(position, 1);
+        }
+
+        if (handlers.length === 0) {
+          if(this.wildcard) {
+            delete leaf._listeners;
+          }
+          else {
+            delete this._events[type];
+          }
+        }
+
+        this.emit("removeListener", type, listener);
+
+        return this;
+      }
+      else if (handlers === listener ||
+        (handlers.listener && handlers.listener === listener) ||
+        (handlers._origin && handlers._origin === listener)) {
+        if(this.wildcard) {
+          delete leaf._listeners;
+        }
+        else {
+          delete this._events[type];
+        }
+
+        this.emit("removeListener", type, listener);
+      }
+    }
+
+    function recursivelyGarbageCollect(root) {
+      if (root === undefined) {
+        return;
+      }
+      var keys = Object.keys(root);
+      for (var i in keys) {
+        var key = keys[i];
+        var obj = root[key];
+        if ((obj instanceof Function) || (typeof obj !== "object") || (obj === null))
+          continue;
+        if (Object.keys(obj).length > 0) {
+          recursivelyGarbageCollect(root[key]);
+        }
+        if (Object.keys(obj).length === 0) {
+          delete root[key];
+        }
+      }
+    }
+    recursivelyGarbageCollect(this.listenerTree);
+
+    return this;
+  };
+
+  EventEmitter.prototype.offAny = function(fn) {
+    var i = 0, l = 0, fns;
+    if (fn && this._all && this._all.length > 0) {
+      fns = this._all;
+      for(i = 0, l = fns.length; i < l; i++) {
+        if(fn === fns[i]) {
+          fns.splice(i, 1);
+          this.emit("removeListenerAny", fn);
+          return this;
+        }
+      }
     } else {
-      list.splice(position, 1);
+      fns = this._all;
+      for(i = 0, l = fns.length; i < l; i++)
+        this.emit("removeListenerAny", fns[i]);
+      this._all = [];
+    }
+    return this;
+  };
+
+  EventEmitter.prototype.removeListener = EventEmitter.prototype.off;
+
+  EventEmitter.prototype.removeAllListeners = function(type) {
+    if (arguments.length === 0) {
+      !this._events || init.call(this);
+      return this;
     }
 
-    if (this._events.removeListener)
-      this.emit('removeListener', type, listener);
-  }
+    if (this.wildcard) {
+      var ns = typeof type === 'string' ? type.split(this.delimiter) : type.slice();
+      var leafs = searchListenerTree.call(this, null, ns, this.listenerTree, 0);
 
-  return this;
-};
-
-EventEmitter.prototype.removeAllListeners = function(type) {
-  var key, listeners;
-
-  if (!this._events)
-    return this;
-
-  // not listening for removeListener, no need to emit
-  if (!this._events.removeListener) {
-    if (arguments.length === 0)
-      this._events = {};
-    else if (this._events[type])
-      delete this._events[type];
-    return this;
-  }
-
-  // emit removeListener for all listeners on all events
-  if (arguments.length === 0) {
-    for (key in this._events) {
-      if (key === 'removeListener') continue;
-      this.removeAllListeners(key);
+      for (var iLeaf=0; iLeaf<leafs.length; iLeaf++) {
+        var leaf = leafs[iLeaf];
+        leaf._listeners = null;
+      }
     }
-    this.removeAllListeners('removeListener');
-    this._events = {};
+    else if (this._events) {
+      this._events[type] = null;
+    }
     return this;
+  };
+
+  EventEmitter.prototype.listeners = function(type) {
+    if (this.wildcard) {
+      var handlers = [];
+      var ns = typeof type === 'string' ? type.split(this.delimiter) : type.slice();
+      searchListenerTree.call(this, handlers, ns, this.listenerTree, 0);
+      return handlers;
+    }
+
+    this._events || init.call(this);
+
+    if (!this._events[type]) this._events[type] = [];
+    if (!isArray(this._events[type])) {
+      this._events[type] = [this._events[type]];
+    }
+    return this._events[type];
+  };
+
+  EventEmitter.prototype.listenerCount = function(type) {
+    return this.listeners(type).length;
+  };
+
+  EventEmitter.prototype.listenersAny = function() {
+
+    if(this._all) {
+      return this._all;
+    }
+    else {
+      return [];
+    }
+
+  };
+
+  if (typeof define === 'function' && define.amd) {
+     // AMD. Register as an anonymous module.
+    define(function() {
+      return EventEmitter;
+    });
+  } else if (typeof exports === 'object') {
+    // CommonJS
+    module.exports = EventEmitter;
   }
-
-  listeners = this._events[type];
-
-  if (isFunction(listeners)) {
-    this.removeListener(type, listeners);
-  } else if (listeners) {
-    // LIFO order
-    while (listeners.length)
-      this.removeListener(type, listeners[listeners.length - 1]);
+  else {
+    // Browser global.
+    window.EventEmitter2 = EventEmitter;
   }
-  delete this._events[type];
-
-  return this;
-};
-
-EventEmitter.prototype.listeners = function(type) {
-  var ret;
-  if (!this._events || !this._events[type])
-    ret = [];
-  else if (isFunction(this._events[type]))
-    ret = [this._events[type]];
-  else
-    ret = this._events[type].slice();
-  return ret;
-};
-
-EventEmitter.prototype.listenerCount = function(type) {
-  if (this._events) {
-    var evlistener = this._events[type];
-
-    if (isFunction(evlistener))
-      return 1;
-    else if (evlistener)
-      return evlistener.length;
-  }
-  return 0;
-};
-
-EventEmitter.listenerCount = function(emitter, type) {
-  return emitter.listenerCount(type);
-};
-
-function isFunction(arg) {
-  return typeof arg === 'function';
-}
-
-function isNumber(arg) {
-  return typeof arg === 'number';
-}
-
-function isObject(arg) {
-  return typeof arg === 'object' && arg !== null;
-}
-
-function isUndefined(arg) {
-  return arg === void 0;
-}
+}();
 
 },{}],27:[function(require,module,exports){
 (function (global){
@@ -11841,12 +12261,392 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var events = require("events");
+var events = require("eventemitter2");
+var adapter = require("webrtc-adapter");
+
+var EventEmitter = events.EventEmitter2;
+
+module.exports = function (_EventEmitter) {
+    _inherits(PeerConnection, _EventEmitter);
+
+    function PeerConnection(config, constraints) {
+        _classCallCheck(this, PeerConnection);
+
+        var _this = _possibleConstructorReturn(this, (PeerConnection.__proto__ || Object.getPrototypeOf(PeerConnection)).call(this));
+
+        _this.logger = console;
+        _this.config = config || {};
+        _this.config.iceServers = _this.config.iceServers || [];
+        _this.config.constraints = _this.config.constraints || {
+            // offerToReceiveAudio: 1,
+            // offerToReceiveVideo: 1
+            mandatory: {
+                OfferToReceiveAudio: true,
+                OfferToReceiveVideo: true
+            }
+        };
+
+        _this.id = _this.config.id;
+        _this.sid = _this.config.sid || Date.now().toString();
+        _this.parent = _this.config.parent;
+        _this.localStream = _this.parent.localStream;
+        _this.stream = null;
+
+        _this.pc = _this.createRTCPeerConnection(_this.parent.config.peerConnectionConfig, _this.parent.config.peerConnectionConstraints);
+        _this.pc.addStream(_this.localStream);
+
+        // bind event to handle peer message
+        _this.getLocalStreams = _this.pc.getLocalStreams.bind(_this.pc);
+        _this.getRemoteStreams = _this.pc.getRemoteStreams.bind(_this.pc);
+
+        // expose event from peer connection
+        _this.pc.onaddstream = _this.emit.bind(_this, "addStream");
+        _this.pc.onremovestream = _this.emit.bind(_this, "removeStream");
+        _this.pc.onnegotiationneeded = _this.emit.bind(_this, "negotiationNeeded");
+
+        // private event handler
+        _this.pc.onicecandidate = _this._onIceCandidate.bind(_this);
+        _this.pc.ondatachannel = _this._onDataChannel.bind(_this);
+
+        // proxy events to parent
+        _this.onAny(function (event, value) {
+            _this.logger.debug("PeerConnection onAny event:", event, value);
+            _this.parent.emit.call(_this.parent, event, value);
+        });
+
+        // own events processing
+        // send offerMsg to signaling server
+        _this.on("offer", function (offerMsg) {
+            _this.send("offer", offerMsg);
+        });
+
+        // send answerMsg to signaling server
+        _this.on("answer", function (answerMsg) {
+            _this.send("answer", answerMsg);
+        });
+
+        // send candidateMsg
+        _this.on("iceCandidate", function (candidate) {
+            _this.send("iceCandidate", candidate);
+        });
+
+        _this.on("addStream", function (event) {
+            if (_this.stream) {
+                _this.logger.warn("Already have a remote stream");
+            } else {
+                _this.stream = event.stream;
+
+                var _iteratorNormalCompletion = true;
+                var _didIteratorError = false;
+                var _iteratorError = undefined;
+
+                try {
+                    for (var _iterator = _this.stream.getTracks()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                        var track = _step.value;
+
+                        track.addEventListener("ended", function () {
+                            if (isAllTracksEnded(stream)) {
+                                _this.logger.debug("stream ended, id:", _this.id);
+                                _this.end();
+                            }
+                        });
+                    }
+                } catch (err) {
+                    _didIteratorError = true;
+                    _iteratorError = err;
+                } finally {
+                    try {
+                        if (!_iteratorNormalCompletion && _iterator.return) {
+                            _iterator.return();
+                        }
+                    } finally {
+                        if (_didIteratorError) {
+                            throw _iteratorError;
+                        }
+                    }
+                }
+
+                _this.parent.emit("peerStreamAdded", _this);
+            }
+        });
+
+        return _this;
+    }
+
+    /**
+     * check browser supports webrtc
+     */
+
+
+    _createClass(PeerConnection, [{
+        key: "isSupportsPeerConnections",
+        value: function isSupportsPeerConnections() {
+            return typeof RTCPeerConnection !== 'undefined';
+        }
+    }, {
+        key: "createRTCPeerConnection",
+        value: function createRTCPeerConnection(config, constraints) {
+            if (this.isSupportsPeerConnections()) {
+                return new RTCPeerConnection(config, constraints);
+            } else {
+                throw "The browser does not support WebRTC (RTCPeerConnection)";
+            }
+        }
+    }, {
+        key: "start",
+        value: function start() {
+            this.offer(this.config.constraints);
+        }
+    }, {
+        key: "end",
+        value: function end() {
+            if (this.isClosed) return;
+
+            this.close();
+            this.isClosed = true;
+            this.parent.removePeerConnection(this);
+            this.parent.emit("peerStreamRemoved", this);
+        }
+
+        /**
+         * handle peer message
+         */
+
+    }, {
+        key: "offer",
+        value: function offer(constraints, callback) {
+            var _this2 = this;
+
+            callback = this._safeCallback(callback);
+            var mediaConstraints = constraints || this.config.constraints;
+            if (this.pc.signalingState === 'closed') return callback("Signaling state is closed");
+
+            // create offer
+            this.pc.createOffer(function (description) {
+                var offerMsg = {
+                    type: "offer",
+                    sdp: description.sdp
+                };
+                _this2.pc.setLocalDescription(description, function () {
+                    _this2.logger.debug("create offer success");
+                    _this2.emit("offer", offerMsg);
+                    callback(null);
+                }, function (err) {
+                    _this2.emit("error", err);
+                    callback(err);
+                });
+            }, function (err) {
+                _this2.emit("error", err);
+                callback(err);
+            }, mediaConstraints);
+        }
+
+        /**
+         * Create sdp answer
+         */
+
+    }, {
+        key: "answer",
+        value: function answer(constraints, callback) {
+            var _this3 = this;
+
+            callback = this._safeCallback(callback);
+            var mediaConstraints = constraints || this.config.constraints;
+
+            if (this.pc.signalingState === 'closed') return callback("Signaling state is closed");
+
+            // create an answer
+            this.pc.createAnswer(function (description) {
+                var answerMsg = {
+                    type: "answer",
+                    sdp: description.sdp
+                };
+                _this3.pc.setLocalDescription(description, function () {
+                    _this3.logger.debug("create answer success");
+                    _this3.emit("answer", answerMsg);
+                    callback(null);
+                }, function (err) {
+                    _this3.emit("error", err);
+                    callback(err);
+                });
+            }, function (err) {
+                _this3.emit("error", err);
+                callback(err);
+            }, mediaConstraints);
+        }
+    }, {
+        key: "processMessage",
+        value: function processMessage(msg) {
+            var _this4 = this;
+
+            this.logger.debug("Preparing proccess peer message", msg.type, msg);
+
+            if (msg.type === "offer") {
+                this.processMsgOffer(msg.payload, function (err) {
+                    if (!err) {
+                        _this4.answer(_this4.config.constraints, function (err) {
+                            if (err) {
+                                _this4.logger.error("Cannot create an answer message", err, msg);
+                            } else {
+                                _this4.logger.info("Sent the answer message to ", msg);
+                            }
+                        });
+                    } else {
+                        _this4.logger.error("Cannot process msgOffer:", err);
+                    }
+                });
+            } else if (msg.type === "answer") {
+                this.processMsgAnswer(msg.payload);
+            } else if (msg.type === "iceCandidate") {
+                this.processMsgCandidate(msg.payload);
+            } else {
+                this.logger.warn("Unknow message", msg);
+            }
+        }
+    }, {
+        key: "processMsgOffer",
+        value: function processMsgOffer(msgOffer, callback) {
+            callback = this._safeCallback(callback);
+            var description = new RTCSessionDescription(msgOffer);
+            this.pc.setRemoteDescription(description, function () {
+                callback(null);
+            }, function (err) {
+                callback(err);
+            });
+        }
+    }, {
+        key: "processMsgAnswer",
+        value: function processMsgAnswer(msgAnswer, callback) {
+            callback = this._safeCallback(callback);
+            var description = new RTCSessionDescription(msgAnswer);
+            this.pc.setRemoteDescription(description, function () {
+                callback(null);
+            }, function (err) {
+                callback(err);
+            });
+        }
+    }, {
+        key: "processMsgCandidate",
+        value: function processMsgCandidate(msgIce, callback) {
+            var _this5 = this;
+
+            callback = this._safeCallback(callback);
+            // IPv6 candidates are only accepted with a= syntax in addIceCandidate
+            // https://bugs.chromium.org/p/webrtc/issues/detail?id=3669
+            if (msgIce.candidate && msgIce.candidate.candidate.indexOf("a=") !== 0) {
+                msgIce.candidate.candidate = "a=" + msgIce.candidate.candidate;
+            }
+
+            var iceCandidate = new RTCIceCandidate(msgIce.candidate);
+            this.pc.addIceCandidate(iceCandidate, function () {}, function (err) {
+                _this5.emit("error", err);
+            });
+            callback(null);
+        }
+
+        /**
+         * Close the peer connection
+         */
+
+    }, {
+        key: "close",
+        value: function close() {
+            this.pc.close();
+            this.emit("close");
+        }
+
+        /**
+         * Add localStream to the peer connection
+         */
+
+    }, {
+        key: "addStream",
+        value: function addStream(stream) {
+            this.logger.debug("Got the stream!");
+            this.localStream = stream;
+            this.pc.addStream(stream);
+        }
+
+        /**
+         * Internal methods
+         */
+
+    }, {
+        key: "_safeCallback",
+        value: function _safeCallback(cb) {
+            return cb || function () {
+                return 1;
+            };
+        }
+    }, {
+        key: "_onIceCandidate",
+        value: function _onIceCandidate(event) {
+            if (event.candidate) {
+                var ice = event.candidate;
+                // let iceCandidate = new RTCIceCandidate(ice.candidate);
+                // this.pc.addIceCandidate(iceCandidate);
+                var iceCandidate = {
+                    candidate: {
+                        candidate: ice.candidate,
+                        sdpMid: ice.sdpMid,
+                        sdpMLineIndex: ice.sdpMLineIndex
+                    }
+                };
+                this.logger.debug("Got an ICE candidate: ", iceCandidate);
+                this.emit("iceCandidate", iceCandidate);
+            } else {
+                this.logger.debug("iceEnd_onIceCandidate", event);
+                this.emit("iceEnd");
+            }
+        }
+    }, {
+        key: "_onDataChannel",
+        value: function _onDataChannel(event) {
+            var channel = event.channel;
+            this.logger.debug("add new channel:", channel);
+            this.emit("addChannel", channel);
+        }
+
+        /**
+         * Handle message
+         */
+        // send via signaling channel
+
+    }, {
+        key: "send",
+        value: function send(msgType, payload) {
+            var msg = {
+                to: this.id,
+                sid: this.sid,
+                type: msgType,
+                payload: payload
+            };
+            this.logger.debug("sending", msgType, msg);
+            this.parent.emit("message", msg);
+        }
+    }]);
+
+    return PeerConnection;
+}(EventEmitter);
+
+},{"eventemitter2":26,"webrtc-adapter":60}],72:[function(require,module,exports){
+"use strict";
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var events = require("eventemitter2");
 var adapter = require("webrtc-adapter");
 var socketio = require("socket.io-client");
 var Promise = require("promise");
+var WebRTC = require("./webrtc");
 
-var EventEmitter = events.EventEmitter;
+var EventEmitter = events.EventEmitter2;
 
 module.exports = function (_EventEmitter) {
     _inherits(RoomRTC, _EventEmitter);
@@ -11862,6 +12662,7 @@ module.exports = function (_EventEmitter) {
         _this.connection = null;
         _this.connectionReady = false;
         _this.roomName = null;
+        _this.localStream = null;
         _this.config = {
             url: "/",
             media: {
@@ -11870,11 +12671,11 @@ module.exports = function (_EventEmitter) {
                 data: false,
                 screen: false
             },
-            mediaConstraints: {
-                audio: true,
+            localMediaConstraints: {
+                audio: false,
                 video: true
             },
-            peerMedia: {
+            peerMediaConstraints: {
                 offerToReceiveVideo: true,
                 offerToReceiveAudio: true
             },
@@ -11895,8 +12696,70 @@ module.exports = function (_EventEmitter) {
             _this.verifyReady();
         });
 
+        _this.connection.on("message", function (msg) {
+            // this.logger.debug("Receive message from singaling server:", msg);
+            if (msg.type == "offer") {
+                // create answer
+                var peer = _this.webrtc.peers.find(function (p) {
+                    return p.sid == msg.sid;
+                });
+                if (!peer) {
+                    _this.logger.debug("Creating a new peer connection to:", msg.from);
+                    peer = _this.webrtc.createPeerConnection({
+                        id: msg.from,
+                        sid: msg.sid
+                    });
+                    _this.emit("peerCreated", peer);
+                }
+                peer.processMessage(msg);
+            } else {
+                // process message
+                var peers = _this.webrtc.peers;
+                peers.forEach(function (peer) {
+                    if (msg.sid) {
+                        if (peer.sid === msg.sid) {
+                            peer.processMessage(msg);
+                        }
+                    } else {
+                        peer.processMessage(msg);
+                    }
+                });
+            }
+        });
+
+        _this.connection.on("remove", function (info) {
+            _this.logger.info("removePeerConnectionById", info);
+            _this.webrtc.removePeerConnectionById(info.id);
+        });
+
+        _this.connection.on("iceservers", function (servers) {
+            _this.logger.debug("Got iceservers info", servers);
+            // TODO: concat to peer connection
+        });
+
+        // init webrtc
+        _this.webrtc = new WebRTC();
+        _this.webrtc.on("peerStreamAdded", _this.handlePeerStreamAdded.bind(_this));
+        _this.webrtc.on("peerStreamRemoved", _this.handlePeerStreamRemoved.bind(_this));
+        _this.webrtc.on("message", function (payload) {
+            _this.logger.debug("send message command", payload);
+            _this.connection.emit("message", payload);
+        });
+
+        // debug all webrtc events
+        _this.webrtc.onAny(function (event, value) {
+            _this.emit.call(_this, event, value);
+        });
+        // log all data to the console
+        _this.onAny(_this.logger.debug.bind(_this.logger, "RoomRTC event:"));
+
         return _this;
     }
+
+    /**
+     * Verify connection ready then emit the event
+     */
+
 
     _createClass(RoomRTC, [{
         key: "verifyReady",
@@ -11905,6 +12768,12 @@ module.exports = function (_EventEmitter) {
                 this.emit("readyToCall", this.connectionId);
             }
         }
+
+        /**
+         * join to exists room
+         * @return roomData(clients, number of participants)
+         */
+
     }, {
         key: "joinRoom",
         value: function joinRoom(name) {
@@ -11920,8 +12789,44 @@ module.exports = function (_EventEmitter) {
                         _this2.emit("error", err);
                         return reject(err);
                     } else {
+                        // try to call everyone in the room
+                        var clients = roomData.clients || [];
+                        for (var id in clients) {
+                            // let clientConstraints = clients[id];
+                            var peer = _this2.webrtc.createPeerConnection({
+                                id: id
+                            });
+                            _this2.emit("peerCreated", peer);
+                            peer.start();
+                        }
+
                         _this2.emit("roomJoined", name);
                         return resolve(roomData);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Create a new room
+         * @return name of the room
+         */
+
+    }, {
+        key: "createRoom",
+        value: function createRoom(name) {
+            var _this3 = this;
+
+            if (!name) return Promise.reject("No room to create");
+            // send command to create a room
+            return new Promise(function (resolve, reject) {
+                _this3.connection.emit('create', name, function (err, roomName) {
+                    if (err) {
+                        _this3.emit("error", err);
+                    } else {
+                        _this3.roomName = roomName;
+                        _this3.emit("roomCreated", roomName);
+                        return resolve(roomName);
                     }
                 });
             });
@@ -11935,11 +12840,100 @@ module.exports = function (_EventEmitter) {
     }, {
         key: "initMediaSource",
         value: function initMediaSource(mediaConstraints, devName) {
+            var _this4 = this;
+
             this.logger.debug("Requesting local media ...");
 
             var dev = devName || "default";
-            var constrains = mediaConstraints || this.config.mediaConstraints;
-            return navigator.mediaDevices.getUserMedia(constrains);
+            var constrains = mediaConstraints || this.config.localMediaConstraints;
+            return navigator.mediaDevices.getUserMedia(constrains).then(function (stream) {
+                // TODO: add event all to all tracks of the stream, multiple streams ?
+                _this4.localStream = stream;
+                _this4.webrtc.addLocalStream(stream);
+                return stream;
+            });
+        }
+    }, {
+        key: "stop",
+        value: function stop(stream) {
+            stream = stream || this.localStream;
+            this.stopStream(stream);
+        }
+
+        /**
+         * Replaces the deprecated MediaStream.stop method
+         */
+
+    }, {
+        key: "stopStream",
+        value: function stopStream(stream) {
+            if (!stream) return;
+            // stop audio tracks
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = stream.getAudioTracks()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var track = _step.value;
+
+                    try {
+                        track.stop();
+                    } catch (err) {
+                        this.logger.debug("stop audio track error:", err);
+                    }
+                }
+                // stop video tracks
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+
+            var _iteratorNormalCompletion2 = true;
+            var _didIteratorError2 = false;
+            var _iteratorError2 = undefined;
+
+            try {
+                for (var _iterator2 = stream.getVideoTracks()[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+                    var _track = _step2.value;
+
+                    try {
+                        _track.stop();
+                    } catch (err) {
+                        this.logger.debug("stop video track error:", err);
+                    }
+                }
+                // stop stream
+            } catch (err) {
+                _didIteratorError2 = true;
+                _iteratorError2 = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                        _iterator2.return();
+                    }
+                } finally {
+                    if (_didIteratorError2) {
+                        throw _iteratorError2;
+                    }
+                }
+            }
+
+            if (typeof stream.stop === 'function') {
+                try {
+                    stream.stop();
+                } catch (err) {}
+            }
         }
 
         /**
@@ -11962,10 +12956,178 @@ module.exports = function (_EventEmitter) {
         value: function revokeObjectURL(url) {
             URL.revokeObjectURL(url);
         }
+
+        /**
+         * handle streaming
+         */
+
+    }, {
+        key: "handlePeerStreamAdded",
+        value: function handlePeerStreamAdded(peer) {
+            var stream = peer.stream;
+            this.logger.debug("A new remote video added:", peer.id);
+            this.emit("videoAdded", stream, peer);
+        }
+    }, {
+        key: "handlePeerStreamRemoved",
+        value: function handlePeerStreamRemoved(peer) {
+            this.logger.debug("A remote video removed:", peer.id);
+            this.emit("videoRemoved", peer);
+        }
     }]);
 
     return RoomRTC;
 }(EventEmitter);
 
-},{"events":26,"promise":37,"socket.io-client":46,"webrtc-adapter":60}]},{},[71])(71)
+},{"./webrtc":73,"eventemitter2":26,"promise":37,"socket.io-client":46,"webrtc-adapter":60}],73:[function(require,module,exports){
+"use strict";
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var events = require("eventemitter2");
+var adapter = require("webrtc-adapter");
+var PeerConnection = require("./peerconnection");
+
+var EventEmitter = events.EventEmitter2;
+
+module.exports = function (_EventEmitter) {
+    _inherits(WebRTC, _EventEmitter);
+
+    function WebRTC(opts) {
+        _classCallCheck(this, WebRTC);
+
+        var _this = _possibleConstructorReturn(this, (WebRTC.__proto__ || Object.getPrototypeOf(WebRTC)).call(this));
+
+        _this.self = _this;
+        _this.logger = console;
+        _this.config = {
+            peerConnectionConfig: {
+                iceServers: [{
+                    'urls': 'stun:stun.l.google.com:19302'
+                }]
+            },
+            peerConnectionConstraints: {
+                optional: []
+            },
+            receiveMedia: {
+                offerToReceiveAudio: 1,
+                offerToReceiveVideo: 1
+            },
+            enableDataChannels: true
+        };
+
+        // hold peer connections
+        _this.peers = [];
+        _this.localStreams = [];
+        return _this;
+    }
+
+    /**
+     *  Declare fields
+     */
+
+
+    _createClass(WebRTC, [{
+        key: "_removeStream",
+
+
+        /**
+         * Private methods
+         */
+        value: function _removeStream(stream) {
+            var index = this.localStreams.indexOf(stream);
+            if (index > -1) {
+                this.localStream.splice(index, 1);
+            }
+        }
+    }, {
+        key: "setPeerConnectionConfig",
+        value: function setPeerConnectionConfig(config, constraints) {
+            this.config.peerConnectionConfig = config;
+            this.config.peerConnectionConstraints = constraints;
+        }
+    }, {
+        key: "isAllTracksEnded",
+        value: function isAllTracksEnded(stream) {
+            var isEnded = true;
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = stream.getTracks()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var track = _step.value;
+
+                    if (track.readyState !== "ended") {
+                        isEnded = false;
+                        break;
+                    }
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+
+            return isEnded;
+        }
+    }, {
+        key: "addLocalStream",
+        value: function addLocalStream(stream) {
+            this.localStreams.push(stream);
+        }
+    }, {
+        key: "createPeerConnection",
+        value: function createPeerConnection(options) {
+            options = options || {};
+            options.parent = this;
+            var peer = new PeerConnection(options);
+            this.peers.push(peer);
+            return peer;
+        }
+    }, {
+        key: "removePeerConnection",
+        value: function removePeerConnection(stream) {
+            var index = this.peers.indexOf(stream);
+            if (index) {
+                this.peers.splice(index, 1);
+            }
+        }
+    }, {
+        key: "removePeerConnectionById",
+        value: function removePeerConnectionById(id) {
+            this.peers.some(function (peer) {
+                if (peer.id == id) {
+                    peer.end();
+                    return true;
+                }
+            });
+        }
+    }, {
+        key: "localStream",
+        get: function get() {
+            // get index 0
+            return this.localStreams.length > 0 ? this.localStreams[0] : null;
+        }
+    }]);
+
+    return WebRTC;
+}(EventEmitter);
+
+},{"./peerconnection":71,"eventemitter2":26,"webrtc-adapter":60}]},{},[72])(72)
 });
