@@ -1,6 +1,6 @@
 {
   "name": "roomrtc",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "RoomRTC enables quick development of webRTC",
   "main": "index.js",
   "scripts": {
@@ -13,10 +13,9 @@
     "url": "git@github.com:Vunb/roomrtc.git"
   },
   "keywords": [
-    "rtc",
-    "room",
-    "webRTC",
-    "RoomRTC"
+    "signaling",
+    "roomrtc",
+    "webrtc"
   ],
   "author": "Vunb",
   "license": "ISC",
@@ -25,6 +24,7 @@
   },
   "homepage": "https://github.com/vunb/roomrtc#readme",
   "dependencies": {
+    "eventemitter2": "2.2.1",
     "promise": "7.1.1",
     "signaling": "0.9.x",
     "socket.io-client": "1.7.2",
