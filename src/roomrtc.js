@@ -176,8 +176,9 @@ module.exports = class RoomRTC extends EventEmitter {
         let constrains = mediaConstraints || this.config.localMediaConstraints;
         return navigator.mediaDevices.getUserMedia(constrains)
             .then(stream => {
-                // TODO: add event all to all tracks of the stream ?
+                // TODO: add event all to all tracks of the stream, multiple streams ?
                 this.localStream = stream;
+                this.webrtc.addLocalStream(stream);
                 return stream;
             });
     }
@@ -236,10 +237,12 @@ module.exports = class RoomRTC extends EventEmitter {
      */
     handlePeerStreamAdded(peer) {
         let stream = peer.stream;
-        this.emit("remoteStreamAdded", stream, peer);
+        this.logger.debug("A new remote video added:", peer.id);
+        this.emit("videoAdded", stream, peer);
     }
 
     handlePeerStreamRemoved(peer) {
-        this.emit("remoteStreamRemoved", peer);
+        this.logger.debug("A remote video removed:", peer.id);
+        this.emit("videoRemoved", peer);
     }
 }

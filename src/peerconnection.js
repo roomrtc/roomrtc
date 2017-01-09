@@ -22,9 +22,11 @@ module.exports = class PeerConnection extends EventEmitter {
         this.id = this.config.id;
         this.sid = this.config.sid || Date.now().toString();
         this.parent = this.config.parent;
-        this.localStream = null;
+        this.localStream = this.parent.localStream;
+        this.stream = null;
 
         this.pc = this.createRTCPeerConnection(this.parent.config.peerConnectionConfig, this.parent.config.peerConnectionConstraints);
+        this.pc.addStream(this.localStream);
 
         // bind event to handle peer message
         this.getLocalStreams = this.pc.getLocalStreams.bind(this.pc);
@@ -59,6 +61,15 @@ module.exports = class PeerConnection extends EventEmitter {
         // send candidateMsg
         this.on("iceCandidate", candidate => {
             this.send("iceCandidate", candidate);
+        });
+
+        this.on("addStream", event => {
+            if (this.stream) {
+                this.logger.warn("Already have a remote stream");
+            } else {
+                this.stream = event.stream;
+                this.parent.emit("peerStreamAdded", this);
+            }
         });
 
     }

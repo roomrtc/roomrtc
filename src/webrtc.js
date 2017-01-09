@@ -28,11 +28,21 @@ module.exports = class WebRTC extends EventEmitter {
 
         // hold peer connections
         this.peers = [];
+        this.localStreams = [];
     }
 
     setPeerConnectionConfig(config, constraints) {
         this.config.peerConnectionConfig = config;
         this.config.peerConnectionConstraints = constraints;
+    }
+
+    get localStream() {
+        // get index 0
+        return this.localStreams.length > 0 ? this.localStreams[0] : null;
+    }
+
+    addLocalStream(stream) {
+        this.localStreams.push(stream);
     }
 
     createPeerConnection(options) {
