@@ -8,6 +8,7 @@
     <!-- load appcss -->
     <link href="bootstrap-v3.3.7.css" rel="stylesheet" type="text/css">
     <link href="style.css" rel="stylesheet" type="text/css">
+    <link href="data:image/png;base64,iVBORw0KGgo=" rel="icon" type="image/png">
     <!-- load appjs -->
     <script src="angular-v1.4.9.js"></script>
     <script src="/roomrtc.bundle.js"></script>
@@ -81,7 +82,7 @@
     </div>
     <div id="remotes">
         <div class="video" ng-repeat="remoteVideo in remoteVideos">
-            <video ng-src="{{remoteVideo}}"></video>
+            <video ng-src="{{remoteVideo}}" resize autoplay="true"></video>
         </div>
     </div>
     <p>Display list clients</p>
