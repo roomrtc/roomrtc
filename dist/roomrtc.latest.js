@@ -12278,8 +12278,10 @@ module.exports = function (_EventEmitter) {
         _this.config = config || {};
         _this.config.iceServers = _this.config.iceServers || [];
         _this.config.constraints = _this.config.constraints || {
-            // offerToReceiveAudio: 1,
-            // offerToReceiveVideo: 1
+            offerToReceiveAudio: 1,
+            offerToReceiveVideo: 1
+        };
+        _this.config.mediaAnswerConstraints = {
             mandatory: {
                 OfferToReceiveAudio: true,
                 OfferToReceiveVideo: true
@@ -12409,7 +12411,7 @@ module.exports = function (_EventEmitter) {
         }
 
         /**
-         * handle peer message
+         * Process local messages
          */
 
     }, {
@@ -12451,7 +12453,7 @@ module.exports = function (_EventEmitter) {
             var _this3 = this;
 
             callback = this._safeCallback(callback);
-            var mediaConstraints = constraints || this.config.constraints;
+            var mediaConstraints = constraints || this.config.mediaAnswerConstraints;
 
             if (this.pc.signalingState === 'closed') return callback("Signaling state is closed");
 
@@ -12474,6 +12476,11 @@ module.exports = function (_EventEmitter) {
                 callback(err);
             }, mediaConstraints);
         }
+
+        /**
+         * Process remote messages
+         */
+
     }, {
         key: "processMessage",
         value: function processMessage(msg) {
@@ -12484,7 +12491,7 @@ module.exports = function (_EventEmitter) {
             if (msg.type === "offer") {
                 this.processMsgOffer(msg.payload, function (err) {
                     if (!err) {
-                        _this4.answer(_this4.config.constraints, function (err) {
+                        _this4.answer(_this4.config.mediaAnswerConstraints, function (err) {
                             if (err) {
                                 _this4.logger.error("Cannot create an answer message", err, msg);
                             } else {
@@ -12592,7 +12599,7 @@ module.exports = function (_EventEmitter) {
                         sdpMLineIndex: ice.sdpMLineIndex
                     }
                 };
-                this.logger.debug("Got an ICE candidate: ", iceCandidate);
+                // this.logger.debug("Got an ICE candidate: ", iceCandidate);
                 this.emit("iceCandidate", iceCandidate);
             } else {
                 this.logger.debug("iceEnd_onIceCandidate", event);
