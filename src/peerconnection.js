@@ -11,8 +11,10 @@ module.exports = class PeerConnection extends EventEmitter {
         this.config = config || {};
         this.config.iceServers = this.config.iceServers || [];
         this.config.constraints = this.config.constraints || {
-            // offerToReceiveAudio: 1,
-            // offerToReceiveVideo: 1
+            offerToReceiveAudio: 1,
+            offerToReceiveVideo: 1
+        }
+        this.config.mediaAnswerConstraints = {
             mandatory: {
                 OfferToReceiveAudio: true,
                 OfferToReceiveVideo: true
@@ -113,7 +115,7 @@ module.exports = class PeerConnection extends EventEmitter {
     }
 
     /**
-     * handle peer message
+     * Process local messages
      */
     offer(constraints, callback) {
         callback = this._safeCallback(callback);
@@ -145,7 +147,7 @@ module.exports = class PeerConnection extends EventEmitter {
      */
     answer(constraints, callback) {
         callback = this._safeCallback(callback);
-        var mediaConstraints = constraints || this.config.constraints;
+        var mediaConstraints = constraints || this.config.mediaAnswerConstraints;
 
         if (this.pc.signalingState === 'closed') return callback("Signaling state is closed");
 
@@ -169,13 +171,16 @@ module.exports = class PeerConnection extends EventEmitter {
         }, mediaConstraints);
     }
 
+    /**
+     * Process remote messages
+     */
     processMessage(msg) {
         this.logger.debug("Preparing proccess peer message", msg.type, msg);
 
         if (msg.type === "offer") {
             this.processMsgOffer(msg.payload, err => {
                 if (!err) {
-                    this.answer(this.config.constraints, err => {
+                    this.answer(this.config.mediaAnswerConstraints, err => {
                         if (err) {
                             this.logger.error("Cannot create an answer message", err, msg);
                         } else {
@@ -267,7 +272,7 @@ module.exports = class PeerConnection extends EventEmitter {
                     sdpMLineIndex: ice.sdpMLineIndex
                 }
             }
-            this.logger.debug("Got an ICE candidate: ", iceCandidate);
+            // this.logger.debug("Got an ICE candidate: ", iceCandidate);
             this.emit("iceCandidate", iceCandidate);
         } else {
             this.logger.debug("iceEnd_onIceCandidate", event);
