@@ -12347,7 +12347,7 @@ module.exports = function (_EventEmitter) {
                         var track = _step.value;
 
                         track.addEventListener("ended", function () {
-                            if (isAllTracksEnded(stream)) {
+                            if (_this.isAllTracksEnded(_this.stream)) {
                                 _this.logger.debug("stream ended, id:", _this.id);
                                 _this.end();
                             }
@@ -12384,6 +12384,38 @@ module.exports = function (_EventEmitter) {
         key: "isSupportsPeerConnections",
         value: function isSupportsPeerConnections() {
             return typeof RTCPeerConnection !== 'undefined';
+        }
+    }, {
+        key: "isAllTracksEnded",
+        value: function isAllTracksEnded(stream) {
+            var _iteratorNormalCompletion2 = true;
+            var _didIteratorError2 = false;
+            var _iteratorError2 = undefined;
+
+            try {
+                for (var _iterator2 = stream.getTracks()[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+                    var track = _step2.value;
+
+                    if (track.readyState !== 'ended') {
+                        return false;
+                    }
+                }
+            } catch (err) {
+                _didIteratorError2 = true;
+                _iteratorError2 = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                        _iterator2.return();
+                    }
+                } finally {
+                    if (_didIteratorError2) {
+                        throw _iteratorError2;
+                    }
+                }
+            }
+
+            return true;
         }
     }, {
         key: "createRTCPeerConnection",
@@ -12671,7 +12703,7 @@ module.exports = function (_EventEmitter) {
         _this.roomName = null;
         _this.localStream = null;
         _this.config = {
-            url: "/",
+            url: "https://roomrtc-signaling-server.herokuapp.com",
             media: {
                 audio: true,
                 video: true,
@@ -12692,6 +12724,13 @@ module.exports = function (_EventEmitter) {
                 muted: true
             }
         };
+
+        // override default config
+        for (var item in _this.options) {
+            if (_this.options.hasOwnProperty(item)) {
+                _this.config[item] = _this.options[item];
+            }
+        }
 
         // init connection to signaling server
         _this.connection = socketio.connect(_this.config.url);
