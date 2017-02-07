@@ -73,7 +73,7 @@ module.exports = class PeerConnection extends EventEmitter {
 
                 for (let track of this.stream.getTracks()) {
                     track.addEventListener("ended", () => {
-                        if (isAllTracksEnded(stream)) {
+                        if (this.isAllTracksEnded(this.stream)) {
                             this.logger.debug("stream ended, id:", this.id);
                             this.end();
                         }
@@ -92,6 +92,15 @@ module.exports = class PeerConnection extends EventEmitter {
     isSupportsPeerConnections() {
         return typeof RTCPeerConnection !== 'undefined';
     };
+
+    isAllTracksEnded(stream) {
+        for (let track of stream.getTracks()) {
+            if(track.readyState !== 'ended') {
+                return false;
+            }
+        }
+        return true;
+    }
 
     createRTCPeerConnection(config, constraints) {
         if (this.isSupportsPeerConnections()) {
