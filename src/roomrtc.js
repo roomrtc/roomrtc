@@ -18,7 +18,7 @@ module.exports = class RoomRTC extends EventEmitter {
         this.roomName = null;
         this.localStream = null;
         this.config = {
-            url: "/",
+            url: "https://roomrtc-signaling-server.herokuapp.com",
             media: {
                 audio: true,
                 video: true,
@@ -37,6 +37,13 @@ module.exports = class RoomRTC extends EventEmitter {
                 autoplay: true,
                 mirror: true,
                 muted: true
+            }
+        }
+
+        // override default config
+        for (let item in this.options) {
+            if (this.options.hasOwnProperty(item)) {
+                this.config[item] = this.options[item];
             }
         }
 
