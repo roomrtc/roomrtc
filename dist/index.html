@@ -16,13 +16,15 @@
         angular.module("demo", [])
             .controller("roomController", function ($scope, $timeout, $sce) {
                 $scope.localVideo = null;
-                $scope.remoteVideos = [];
+                $scope.remoteVideos = {};
 
                 var room = $scope.room = (location.search && location.search.split('?')[1]) || "demo";
                 var roomRTC = new RoomRTC({ url: '/' });
+
                 roomRTC.on("connected", function (id) {
                     console.log("connected connectionId: ", id);
                 });
+
                 roomRTC.on("readyToCall", function (id) {
                     console.log("readyToCall, connectionId: ", id);
                     roomRTC.initMediaSource()
@@ -45,12 +47,26 @@
                         });
                 });
 
-                roomRTC.on("videoAdded", function(stream, pc) {
-                    console.log("Ohh, we have a new participant", pc.id);
+                roomRTC.on("videoAdded", function(pc, stream) {
+                    var pid = pc.id;
+                    console.log("Ohh, we have a new participant", pid);
                     $timeout(function() {
                         var streamUrl = roomRTC.getStreamAsUrl(stream);
                         var trustUrl = $sce.trustAsResourceUrl(streamUrl);
-                        $scope.remoteVideos.push(trustUrl);
+                        $scope.remoteVideos[pid] = trustUrl;
+                        $scope.clients[pid] = pc.resources;
+                    })
+                });
+
+                roomRTC.on("videoRemoved", function(pc) {
+                    var pid = pc.id;
+                    var url = $scope.remoteVideos[pid];
+                    roomRTC.revokeObjectURL(url);
+                    console.log("Ohh, a participant has gone", pid);
+                    $timeout(function() {
+                        // remove url from remoteVideos
+                        delete $scope.remoteVideos[pid];
+                        delete $scope.clients[pid];
                     })
                 });
 
@@ -58,6 +74,7 @@
                  * Setup control buttons
                  * */
                 $scope.stop = function () {
+                    $scope.localVideo = null;
                     roomRTC.stop();
                 }
 
@@ -81,8 +98,8 @@
         <input type="button" value="Start" ng-click="start()">
     </div>
     <div id="remotes">
-        <div class="video" ng-repeat="remoteVideo in remoteVideos">
-            <video ng-src="{{remoteVideo}}" resize autoplay="true"></video>
+        <div class="video" ng-repeat="(id, remoteVideo) in remoteVideos">
+            <video id="{{id}}" ng-src="{{remoteVideo}}" resize autoplay="true"></video>
         </div>
     </div>
     <p>Display list clients</p>
