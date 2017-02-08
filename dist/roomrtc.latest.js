@@ -13012,7 +13012,7 @@ module.exports = function (_EventEmitter) {
         value: function handlePeerStreamAdded(peer) {
             var stream = peer.stream;
             this.logger.debug("A new remote video added:", peer.id);
-            this.emit("videoAdded", stream, peer);
+            this.emit("videoAdded", peer, stream);
         }
     }, {
         key: "handlePeerStreamRemoved",
