@@ -17,9 +17,18 @@
             .controller("roomController", function ($scope, $timeout, $sce) {
                 $scope.localVideo = null;
                 $scope.remoteVideos = {};
+                $scope.isConnected = false;
 
                 var room = $scope.room = (location.search && location.search.split('?')[1]) || "demo";
                 var roomRTC = new RoomRTC({ url: '/' });
+
+                roomRTC.initMediaSource()
+                    .then(stream => {
+                        var streamUrl = roomRTC.getStreamAsUrl(stream);
+                        $timeout(function () {
+                            $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
+                        });
+                    });
 
                 roomRTC.on("connected", function (id) {
                     console.log("connected connectionId: ", id);
@@ -27,17 +36,11 @@
 
                 roomRTC.on("readyToCall", function (id) {
                     console.log("readyToCall, connectionId: ", id);
-                    roomRTC.initMediaSource()
-                        .then(stream => {
-                            var streamUrl = roomRTC.getStreamAsUrl(stream);
-                            $timeout(function () {
-                                $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
-                            });
-                            return roomRTC.joinRoom(room);
-                        })
+                    roomRTC.joinRoom(room)
                         .then(roomData => {
                             console.log("joinRoom ok: ", roomData);
                             $timeout(function () {
+                                $scope.isConnected = true;
                                 $scope.clients = roomData.clients;
                             });
                             return roomData.clients;
@@ -91,21 +94,28 @@
 </head>
 
 <body ng-controller="roomController">
-    <h1>You are in room: <span ng-bind="room">...</span></h1>
-    <video class="mirror" id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
-    <div class="media-controls">
-        <input type="button" value="Stop" ng-click="stop()">&nbsp;
-        <input type="button" value="Start" ng-click="start()">
+    <div class="row">
+        <div class="col-xs-6">
+            <h1 ng-if="!isConnected">Connecting to: <span ng-bind="room">demo</span>...</h1>
+            <h1 ng-if="isConnected">You are in room: <span ng-bind="room">demo</span></h1>
+            <video class="mirror" id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
+            <div class="media-controls">
+                <input type="button" value="Stop" ng-click="stop()">&nbsp;
+                <input type="button" value="Start" ng-click="start()">
+            </div>
+        </div>
+        <div class="col-xs-6">
+            <h4>Display list clients</h4>
+            <ul>
+                <li ng-repeat="(id, client) in clients">{{ $index + 1 }}: [{{ id }},{{ client.name }}]</li>
+            </ul>
+        </div>
     </div>
     <div id="remotes">
         <div class="video" ng-repeat="(id, remoteVideo) in remoteVideos">
             <video id="{{id}}" ng-src="{{remoteVideo}}" resize autoplay="true"></video>
         </div>
     </div>
-    <p>Display list clients</p>
-    <ul>
-        <li ng-repeat="(id, client) in clients">{{ $index + 1 }}: [{{ id }},{{ client.name }}]</li>
-    </ul>
 </body>
 
 </html>

@@ -18,6 +18,7 @@ module.exports = class RoomRTC extends EventEmitter {
         this.roomName = null;
         this.localStream = null;
         this.config = {
+            autoConnect: true,
             url: "https://roomrtc-signaling-server.herokuapp.com",
             media: {
                 audio: true,
@@ -47,7 +48,30 @@ module.exports = class RoomRTC extends EventEmitter {
             }
         }
 
-        // init connection to signaling server
+        // init webrtc
+        this.webrtc = new WebRTC();
+        this.webrtc.on("peerStreamAdded", this.handlePeerStreamAdded.bind(this));
+        this.webrtc.on("peerStreamRemoved", this.handlePeerStreamRemoved.bind(this));
+        this.webrtc.on("message", payload => {
+            this.logger.debug("send message command", payload);
+            this.connection.emit("message", payload);
+        });
+
+        // debug all webrtc events
+        this.webrtc.onAny((event, value) => {
+            this.emit.call(this, event, value);
+        })
+        // log all data to the console
+        this.onAny(this.logger.debug.bind(this.logger, "RoomRTC event:"));
+
+        if (this.config.autoConnect) {
+            // init connection to signaling server
+            this.connect();
+        }
+    }
+
+    connect() {
+        
         this.connection = socketio.connect(this.config.url);
 
         this.connection.on("connect", () => {
@@ -95,23 +119,14 @@ module.exports = class RoomRTC extends EventEmitter {
             this.logger.debug("Got iceservers info", servers);
             // TODO: concat to peer connection
         });
+ 
+    }
 
-        // init webrtc
-        this.webrtc = new WebRTC();
-        this.webrtc.on("peerStreamAdded", this.handlePeerStreamAdded.bind(this));
-        this.webrtc.on("peerStreamRemoved", this.handlePeerStreamRemoved.bind(this));
-        this.webrtc.on("message", payload => {
-            this.logger.debug("send message command", payload);
-            this.connection.emit("message", payload);
-        });
-
-        // debug all webrtc events
-        this.webrtc.onAny((event, value) => {
-            this.emit.call(this, event, value);
-        })
-        // log all data to the console
-        this.onAny(this.logger.debug.bind(this.logger, "RoomRTC event:"));
-
+    disconnect() {
+        if (this.connection) {
+            this.connection.disconnect();
+            delete this.connection;
+        }
     }
 
     /**
@@ -234,6 +249,7 @@ module.exports = class RoomRTC extends EventEmitter {
      * @return: blobUrl
      */
     getStreamAsUrl(stream) {
+        var URL = window.URL || window.webkitURL;
         return URL.createObjectURL(stream);
     }
 
@@ -241,6 +257,7 @@ module.exports = class RoomRTC extends EventEmitter {
      * revokeObjectURL
      */
     revokeObjectURL(url) {
+        var URL = window.URL || window.webkitURL;
         URL.revokeObjectURL(url);
     }
 
