@@ -1,12 +1,13 @@
 {
   "name": "roomrtc",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "RoomRTC enables quick development of webRTC",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "demo": "node dist/demo.js",
-    "build": "node build.js"
+    "build": "node build.js",
+    "release": "node build.js release"
   },
   "repository": {
     "type": "git",
@@ -38,6 +39,7 @@
     "cookie-parser": "^1.4.3",
     "express": "^4.14.0",
     "express-session": "^1.14.2",
-    "uglify-js": "2.7.5"
+    "uglify-js": "2.7.5",
+    "uglifyify": "^3.0.4"
   }
 }
