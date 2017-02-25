@@ -16,7 +16,7 @@ if (!release) {
         .bundle()
         .pipe(fs.createWriteStream('dist/roomrtc.bundle.js'));
 } else {
-    let fileOut = fs.createWriteStream('dist/roomrtc.latest.js');
+    let fileOut = fs.createWriteStream('dist/roomrtc.min.js');
     let pks = fs.readFileSync('package.json');
     let pkg = JSON.parse(pks);
 

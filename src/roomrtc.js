@@ -21,12 +21,6 @@ module.exports = class RoomRTC extends EventEmitter {
             autoConnect: true,
             url: "https://roomrtc-signaling-server.herokuapp.com",
             media: {
-                audio: true,
-                video: true,
-                data: false,
-                screen: false
-            },
-            localMediaConstraints: {
                 audio: false,
                 video: true
             },
@@ -200,7 +194,7 @@ module.exports = class RoomRTC extends EventEmitter {
         this.logger.debug("Requesting local media ...");
 
         let dev = devName || "default";
-        let constrains = mediaConstraints || this.config.localMediaConstraints;
+        let constrains = mediaConstraints || this.config.media;
         return navigator.mediaDevices.getUserMedia(constrains)
             .then(stream => {
                 // TODO: add event all to all tracks of the stream, multiple streams ?
