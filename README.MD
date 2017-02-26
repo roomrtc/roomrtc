@@ -2,6 +2,8 @@ RoomRTC
 ================
 RoomRTC enables quick development of webRTC
 
+**Status**: v1.0.0 coming soon.
+
 Installation In A Nutshell
 ===========================
 I'd recommend using a package manager if you aren't already and here are the relevant instructions for installing RoomRTC from a number of popular options:
@@ -10,18 +12,24 @@ I'd recommend using a package manager if you aren't already and here are the rel
 2. Download using package manager
     * **npm**: `npm install roomrtc --save`
     * **bower**: `bower install roomrtc --save`
+3. Include the library
+    * Server: `var roomrtc = require('roomrtc')`
+    * Client: `<script src="https://roomrtc.github.io/dist/roomrtc.min.js"></script>`
 
-Documentation
-==============
-All documentation can be found within [the docs folder](./docs/).
+Website and documentation
+=========================
 
-Run demo: 
+* Visit [roomrtc.github.io](https://roomrtc.github.io) to explore demos and examples.
 
-* Change dir: `cd node_modules/roomrtc`
+Run roomrtc as your own server:
+
+* Clone repo: `git clone https://github.com/vunb/roomrtc.git`
+* Change dir: `cd roomrtc`
+* Install deps: `npm install`
 * Start server: `npm run demo`
 * Open browser: `http://localhost:8123/?myroom`
 
 License
 ========
 
-.
+MIT
