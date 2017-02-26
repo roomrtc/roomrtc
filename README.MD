@@ -14,7 +14,7 @@ I'd recommend using a package manager if you aren't already and here are the rel
     * **bower**: `bower install roomrtc --save`
 3. Include the library
     * Server: `var roomrtc = require('roomrtc')`
-    * Client: `<script src="https://roomrtc.github.io/dist/roomrtc.min.js"></script>`
+    * Client: `<script src="https://roomrtc.github.io/latest/roomrtc.min.js"></script>`
 
 Website and documentation
 =========================
