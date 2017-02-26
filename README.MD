@@ -19,7 +19,7 @@ I'd recommend using a package manager if you aren't already and here are the rel
 Website and documentation
 =========================
 
-* [roomrtc.github.io](https://roomrtc.github.io)
+* Visit [roomrtc.github.io](https://roomrtc.github.io) to explore demos and examples.
 
 Run roomrtc as your own server:
 
