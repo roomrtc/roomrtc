@@ -19,7 +19,7 @@
     "webrtc"
   ],
   "author": "Vunb",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/vunb/roomrtc/issues"
   },
