@@ -52,7 +52,12 @@ module.exports = class PeerConnection extends EventEmitter {
         // own events processing
         // send offerMsg to signaling server
         this.on("offer", offerMsg => {
-            this.send("offer", offerMsg);
+            if (!this.config.connectMediaServer) {
+                this.send("offer", offerMsg);
+            } else {
+                // send offerMsg at iceEnd event.
+                this.logger.info('Do not send mgsOffer at this time, wait iceEnd ...');
+            }
         });
 
         // send answerMsg to signaling server
@@ -65,23 +70,31 @@ module.exports = class PeerConnection extends EventEmitter {
             this.send("iceCandidate", candidate);
         });
 
-        this.on("addStream", event => {
-            if (this.stream) {
-                this.logger.warn("Already have a remote stream");
-            } else {
-                this.stream = event.stream;
-
-                for (let track of this.stream.getTracks()) {
-                    track.addEventListener("ended", () => {
-                        if (this.isAllTracksEnded(this.stream)) {
-                            this.logger.debug("stream ended, id:", this.id);
-                            this.end();
-                        }
-                    });
-                }
-
-                this.parent.emit("peerStreamAdded", this);
+        this.on('iceEnd', offerMsg => {
+            if (this.config.connectMediaServer) {
+                this.send('offer', offerMsg);
             }
+        });
+
+        this.on("addStream", event => {
+            // if (this.stream) {
+            //     this.logger.warn("Already have a remote stream");
+            // } else {
+            // // TODO: Support multiple streams ?
+            this.stream = event.stream;
+            this.stream.psid = `${this.id || this.sid}_${this.stream.id}`;
+
+            for (let track of this.stream.getTracks()) {
+                track.addEventListener("ended", () => {
+                    if (this.isAllTracksEnded(this.stream)) {
+                        this.logger.debug("stream ended, id:", this.id);
+                        this.end();
+                    }
+                });
+            }
+
+            this.parent.emit("peerStreamAdded", this);
+            // }
         });
 
     }
@@ -95,7 +108,7 @@ module.exports = class PeerConnection extends EventEmitter {
 
     isAllTracksEnded(stream) {
         for (let track of stream.getTracks()) {
-            if(track.readyState !== 'ended') {
+            if (track.readyState !== 'ended') {
                 return false;
             }
         }
@@ -126,10 +139,14 @@ module.exports = class PeerConnection extends EventEmitter {
     /**
      * Process local messages
      */
-    offer(constraints, callback) {
-        callback = this._safeCallback(callback);
+    offer(constraints, cb) {
+        var callback = this._safeCallback(cb);
         var mediaConstraints = constraints || this.config.constraints;
         if (this.pc.signalingState === 'closed') return callback("Signaling state is closed");
+
+        if (this.config.connectMediaServer) {
+            mediaConstraints = null;
+        }
 
         // create offer
         this.pc.createOffer(description => {
@@ -139,8 +156,11 @@ module.exports = class PeerConnection extends EventEmitter {
             }
             this.pc.setLocalDescription(description, () => {
                 this.logger.debug("create offer success");
-                this.emit("offer", offerMsg);
-                callback(null);
+                if (!cb) {
+                    this.emit("offer", offerMsg);
+                } else {
+                    callback(null, offerMsg);
+                }
             }, (err) => {
                 this.emit("error", err);
                 callback(err);
@@ -169,7 +189,7 @@ module.exports = class PeerConnection extends EventEmitter {
             this.pc.setLocalDescription(description, () => {
                 this.logger.debug("create answer success");
                 this.emit("answer", answerMsg);
-                callback(null);
+                callback(null, answerMsg);
             }, (err) => {
                 this.emit("error", err);
                 callback(err);
@@ -201,9 +221,17 @@ module.exports = class PeerConnection extends EventEmitter {
                 }
             });
         } else if (msg.type === "answer") {
-            this.processMsgAnswer(msg.payload);
+            this.processMsgAnswer(msg.payload, err => {
+                if (err) {
+                    this.logger.error('Cannot process msgAnswer:', err, msg);
+                }
+            });
         } else if (msg.type === "iceCandidate") {
-            this.processMsgCandidate(msg.payload);
+            this.processMsgCandidate(msg.payload, err => {
+                if (err) {
+                    this.logger.error('Cannot process msgCandidate:', err, msg);
+                }
+            });
         } else {
             this.logger.warn("Unknow message", msg);
         }
@@ -271,6 +299,11 @@ module.exports = class PeerConnection extends EventEmitter {
 
     _onIceCandidate(event) {
         if (event.candidate) {
+            if (this.config.connectMediaServer) {
+                // do nothing.
+                this.logger.debug('Dont send ice candidate: ', this.id);
+                return;
+            }
             let ice = event.candidate;
             // let iceCandidate = new RTCIceCandidate(ice.candidate);
             // this.pc.addIceCandidate(iceCandidate);
@@ -285,7 +318,11 @@ module.exports = class PeerConnection extends EventEmitter {
             this.emit("iceCandidate", iceCandidate);
         } else {
             this.logger.debug("iceEnd_onIceCandidate", event);
-            this.emit("iceEnd");
+            let offerMsg = {
+                type: "offer",
+                sdp: this.pc.localDescription.sdp
+            }
+            this.emit("iceEnd", offerMsg);
         }
     }
 

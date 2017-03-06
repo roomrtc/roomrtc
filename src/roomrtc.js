@@ -19,6 +19,8 @@ module.exports = class RoomRTC extends EventEmitter {
         this.localStream = null;
         this.config = {
             autoConnect: true,
+            connectMediaServer: false,
+            username: false,
             url: "https://roomrtc-signaling-server.herokuapp.com",
             media: {
                 audio: false,
@@ -65,7 +67,7 @@ module.exports = class RoomRTC extends EventEmitter {
     }
 
     connect() {
-        
+
         this.connection = socketio.connect(this.config.url);
 
         this.connection.on("connect", () => {
@@ -113,7 +115,7 @@ module.exports = class RoomRTC extends EventEmitter {
             this.logger.debug("Got iceservers info", servers);
             // TODO: concat to peer connection
         });
- 
+
     }
 
     disconnect() {
@@ -128,7 +130,11 @@ module.exports = class RoomRTC extends EventEmitter {
      */
     verifyReady() {
         if (this.connectionReady) {
-            this.emit("readyToCall", this.connectionId);
+            if (!this.config.connectMediaServer) {
+                this.emit("readyToCall", this.connectionId);
+            } else {
+                this.emit('readyToJoinMediaServer', this.connectionId);
+            }
         }
     }
 
@@ -162,6 +168,42 @@ module.exports = class RoomRTC extends EventEmitter {
                     return resolve(roomData);
                 }
             });
+        });
+    }
+
+    /**
+     * Request to join media server
+     */
+    joinMediaServer(name) {
+        if (!name) return Promise.reject("No room to join");
+        // set name of the room wanna join
+        this.roomName = name;
+        return new Promise((resolve, reject) => {
+            let username = this.config.username || this.connectionId;
+            let pc = this.webrtc.createPeerConnection({
+                id: this.connectionId,
+                connectMediaServer: this.config.connectMediaServer
+            });
+            this.emit("peerCreated", pc);
+            pc.start();
+            // pc.offer(null, (err, msgOffer) => {
+            //     // send sdp capabilities
+            //     let message = {
+            //         type: 'join',
+            //         username: username,
+            //         room: this.roomName,
+            //         capabilities: msgOffer.sdp,
+            //         payload: msgOffer
+            //     }
+            //     this.connection.emit("message", message, (err, data) => {
+            //         this.logger.info('joinMediaServer send msg success', message, err, data);
+            //         if (!err) {
+            //             resolve(data);
+            //         } else {
+            //             reject(err);
+            //         }
+            //     });
+            // });
         });
     }
 
