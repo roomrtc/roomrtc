@@ -1,6 +1,6 @@
 {
   "name": "roomrtc",
-  "version": "0.9.7",
+  "version": "0.10.0",
   "description": "RoomRTC enables quick development of webRTC",
   "main": "dist/roomrtc.min.js",
   "authors": [
