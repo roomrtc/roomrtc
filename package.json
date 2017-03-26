@@ -1,17 +1,18 @@
 {
   "name": "roomrtc",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "RoomRTC enables quick development of webRTC",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node basicServer",
     "demo": "node dist/demo.js",
     "build": "node build.js",
     "release": "node build.js release"
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:Vunb/roomrtc.git"
+    "url": "git@github.com:vunb/roomrtc.git"
   },
   "keywords": [
     "signaling",
@@ -27,7 +28,7 @@
   "dependencies": {
     "eventemitter2": "2.2.1",
     "promise": "7.1.1",
-    "signaling": "0.9.x",
+    "signaling": "0.10.x",
     "socket.io-client": "1.7.2",
     "webrtc-adapter": "2.1.0"
   },
