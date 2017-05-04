@@ -1,6 +1,6 @@
 {
   "name": "roomrtc",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "RoomRTC enables quick development of webRTC",
   "main": "index.js",
   "scripts": {
@@ -26,9 +26,10 @@
   },
   "homepage": "https://github.com/vunb/roomrtc#readme",
   "dependencies": {
+    "bowser": "^1.6.1",
     "eventemitter2": "2.2.1",
     "promise": "7.1.1",
-    "signaling": "0.10.x",
+    "signaling": "^0.11.0",
     "socket.io-client": "1.7.2",
     "webrtc-adapter": "2.1.0"
   },
