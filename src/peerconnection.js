@@ -3,6 +3,7 @@ const adapter = require("webrtc-adapter");
 
 const EventEmitter = events.EventEmitter2;
 
+// TODO: Change class name PeerConnection to Peer
 module.exports = class PeerConnection extends EventEmitter {
 
     constructor(config, constraints) {
@@ -52,12 +53,8 @@ module.exports = class PeerConnection extends EventEmitter {
         // own events processing
         // send offerMsg to signaling server
         this.on("offer", offerMsg => {
-            if (!this.config.connectMediaServer) {
-                this.send("offer", offerMsg);
-            } else {
-                // send offerMsg at iceEnd event.
-                this.logger.info('Do not send mgsOffer at this time, wait iceEnd ...');
-            }
+            this.logger.info('send msg offer', offerMsg);
+            this.send("offer", offerMsg);
         });
 
         // send answerMsg to signaling server
@@ -71,16 +68,11 @@ module.exports = class PeerConnection extends EventEmitter {
         });
 
         this.on('iceEnd', offerMsg => {
-            if (this.config.connectMediaServer) {
-                this.send('offer', offerMsg);
-            }
+            this.parent.emit('iceEnd', this, offerMsg);
         });
 
         this.on("addStream", event => {
-            // if (this.stream) {
-            //     this.logger.warn("Already have a remote stream");
-            // } else {
-            // // TODO: Support multiple streams ?
+            // TODO: Support multiple streams, save them to Set ?
             this.stream = event.stream;
             this.stream.psid = `${this.id || this.sid}_${this.stream.id}`;
 
@@ -90,11 +82,31 @@ module.exports = class PeerConnection extends EventEmitter {
                         this.logger.debug("stream ended, id:", this.id);
                         this.end();
                     }
+                    // notify
+                    this.parent.emit('removetrack', track);
                 });
             }
 
+            this.stream.addEventListener('addtrack', (event) =>
+			{
+				let track = event.track;
+
+				this.logger.debug('stream "addtrack" event [track:%o]', track);
+                this.parent.emit('addtrack', track);
+
+				// Firefox does not implement 'stream.onremovetrack' so let's use 'track.ended'.
+				// But... track "ended" is neither fired.
+				// https://bugzilla.mozilla.org/show_bug.cgi?id=1347578
+				track.addEventListener('ended', () =>
+				{
+					this.logger.debug('track "ended" event [track:%o]', track);
+                    this.end();
+					
+                    this.parent.emit('removetrack', track);
+				});
+            });
+
             this.parent.emit("peerStreamAdded", this);
-            // }
         });
 
     }
@@ -144,16 +156,16 @@ module.exports = class PeerConnection extends EventEmitter {
         var mediaConstraints = constraints || this.config.constraints;
         if (this.pc.signalingState === 'closed') return callback("Signaling state is closed");
 
-        if (this.config.connectMediaServer) {
-            mediaConstraints = null;
-        }
-
         // create offer
         this.pc.createOffer(description => {
             let offerMsg = {
                 type: "offer",
                 sdp: description.sdp
             }
+            if (this.config.connectMediaServer) {
+                return this.emit("offer", offerMsg);
+            }
+            // set local sdp
             this.pc.setLocalDescription(description, () => {
                 this.logger.debug("create offer success");
                 if (!cb) {
@@ -232,6 +244,8 @@ module.exports = class PeerConnection extends EventEmitter {
                     this.logger.error('Cannot process msgCandidate:', err, msg);
                 }
             });
+        } else if (msg.type === "welcome") {
+            this.emit("welcome", msg);
         } else {
             this.logger.warn("Unknow message", msg);
         }

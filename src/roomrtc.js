@@ -19,6 +19,7 @@ module.exports = class RoomRTC extends EventEmitter {
         this.localStream = null;
         this.config = {
             autoConnect: true,
+            autoCallPeers: true,
             connectMediaServer: false,
             username: false,
             url: "https://roomrtc-signaling-server.herokuapp.com",
@@ -74,14 +75,14 @@ module.exports = class RoomRTC extends EventEmitter {
             this.connectionReady = true;
             this.connectionId = this.connection.id
             this.emit("connected", this.connectionId);
-            this.verifyReady();
+            // this.verifyReady();
         });
 
         this.connection.on("message", msg => {
             // this.logger.debug("Receive message from singaling server:", msg);
             if (msg.type == "offer") {
                 // create answer
-                let peer = this.webrtc.peers.find(p => p.sid == msg.sid);
+                let peer = this.webrtc.peers.find(p => p.id === msg.from);
                 if (!peer) {
                     this.logger.debug("Creating a new peer connection to:", msg.from);
                     peer = this.webrtc.createPeerConnection({
@@ -104,6 +105,10 @@ module.exports = class RoomRTC extends EventEmitter {
                     }
                 });
             }
+        });
+
+        this.connection.on('ready', data => {
+            this.emit("readyToCall", this.connectionId);
         });
 
         this.connection.on("remove", info => {
@@ -152,8 +157,8 @@ module.exports = class RoomRTC extends EventEmitter {
                 if (err) {
                     this.emit("error", err);
                     return reject(err);
-                } else {
-                    // try to call everyone in the room
+                } else if (!this.config.connectMediaServer && this.config.autoCallPeers) {
+                    // try to call everyone in the room (without media server)
                     let clients = roomData.clients || [];
                     for (let id in clients) {
                         // let clientConstraints = clients[id];
@@ -165,6 +170,9 @@ module.exports = class RoomRTC extends EventEmitter {
                     }
 
                     this.emit("roomJoined", name);
+                    return resolve(roomData);
+                } else {
+                    this.logger.info('joinRoom media server ok!');
                     return resolve(roomData);
                 }
             });
@@ -178,33 +186,30 @@ module.exports = class RoomRTC extends EventEmitter {
         if (!name) return Promise.reject("No room to join");
         // set name of the room wanna join
         this.roomName = name;
-        return new Promise((resolve, reject) => {
-            let username = this.config.username || this.connectionId;
-            let pc = this.webrtc.createPeerConnection({
-                id: this.connectionId,
-                connectMediaServer: this.config.connectMediaServer
-            });
-            this.emit("peerCreated", pc);
-            pc.start();
-            // pc.offer(null, (err, msgOffer) => {
-            //     // send sdp capabilities
-            //     let message = {
-            //         type: 'join',
-            //         username: username,
-            //         room: this.roomName,
-            //         capabilities: msgOffer.sdp,
-            //         payload: msgOffer
-            //     }
-            //     this.connection.emit("message", message, (err, data) => {
-            //         this.logger.info('joinMediaServer send msg success', message, err, data);
-            //         if (!err) {
-            //             resolve(data);
-            //         } else {
-            //             reject(err);
-            //         }
-            //     });
-            // });
-        });
+        return Promise.resolve()
+            .then(() => {
+                let username = this.config.username || this.connectionId;
+                // TODO: Rename webrtc.createPeerConnection() --> webrtc.createPeer()
+                let peer = this.webrtc.createPeerConnection({
+                    id: this.connectionId,
+                    connectMediaServer: this.config.connectMediaServer
+                });
+                this.emit("peerCreated", peer);
+                peer.start();
+                // do not peer.start();
+                // return peer.pc.createOffer({
+                //     offerToReceiveAudio: 1,
+                //     offerToReceiveVideo: 1
+                // });
+            })
+            // .then((description) => {
+            //     // send back capabilities info
+            //     this.connection.emit('message', {
+            //         type: 'capabilities',
+            //         usePlanB: this.webrtc.isPlanB(),
+            //         capabilities: description.sdp
+            //     })
+            // })
     }
 
     /**

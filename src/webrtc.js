@@ -1,6 +1,7 @@
-const events = require("eventemitter2");
-const adapter = require("webrtc-adapter");
-const PeerConnection = require("./peerconnection");
+const events = require('eventemitter2');
+const adapter = require('webrtc-adapter');
+const browser = require('bowser');
+const PeerConnection = require('./peerconnection');
 
 const EventEmitter = events.EventEmitter2;
 
@@ -57,7 +58,7 @@ module.exports = class WebRTC extends EventEmitter {
     isAllTracksEnded(stream) {
         let isEnded = true;
         for (let track of stream.getTracks()) {
-            if (track.readyState !== "ended") {
+            if (track.readyState !== 'ended') {
                 isEnded = false;
                 break;
             }
@@ -91,6 +92,12 @@ module.exports = class WebRTC extends EventEmitter {
                 return true;
             }
         });
+    }
+
+    isPlanB() {
+        if (browser.chrome || browser.chromium || browser.opera)
+            return true;
+        else return false;
     }
 
 }
