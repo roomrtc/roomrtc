@@ -22,22 +22,17 @@
                 var room = $scope.room = (location.search && location.search.split('?')[1]) || "demo";
                 var roomRTC = new RoomRTC({ url: '/' });
 
-                roomRTC.initMediaSource()
-                    .then(stream => {
-                        var streamUrl = roomRTC.getStreamAsUrl(stream);
-                        $timeout(function () {
-                            $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
-                        });
-                    });
-
                 roomRTC.on("connected", function (id) {
                     console.log("connected connectionId: ", id);
-                });
-
-                roomRTC.on("readyToCall", function (id) {
-                    console.log("readyToCall, connectionId: ", id);
-                    roomRTC.joinRoom(room)
-                        .then(roomData => {
+                    roomRTC.initMediaSource()
+                        .then((stream) => {
+                            var streamUrl = roomRTC.getStreamAsUrl(stream);
+                            $timeout(function () {
+                                $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
+                            });
+                            return roomRTC.joinRoom(room);
+                        })
+                        .then((roomData) => {
                             console.log("joinRoom ok: ", roomData);
                             $timeout(function () {
                                 $scope.isConnected = true;
@@ -45,15 +40,19 @@
                             });
                             return roomData.clients;
                         })
-                        .catch(err => {
+                        .catch((err) => {
                             console.error("joinRoom error: ", err);
                         });
                 });
 
-                roomRTC.on("videoAdded", function(pc, stream) {
+                roomRTC.on("readyToCall", function (id) {
+                    console.log("readyToCall, connectionId: ", id);
+                });
+
+                roomRTC.on("videoAdded", function (pc, stream) {
                     var pid = pc.id;
                     console.log("Ohh, we have a new participant", pid);
-                    $timeout(function() {
+                    $timeout(function () {
                         var streamUrl = roomRTC.getStreamAsUrl(stream);
                         var trustUrl = $sce.trustAsResourceUrl(streamUrl);
                         $scope.remoteVideos[pid] = trustUrl;
@@ -61,12 +60,12 @@
                     })
                 });
 
-                roomRTC.on("videoRemoved", function(pc) {
+                roomRTC.on("videoRemoved", function (pc) {
                     var pid = pc.id;
                     var url = $scope.remoteVideos[pid];
                     roomRTC.revokeObjectURL(url);
                     console.log("Ohh, a participant has gone", pid);
-                    $timeout(function() {
+                    $timeout(function () {
                         // remove url from remoteVideos
                         delete $scope.remoteVideos[pid];
                         delete $scope.clients[pid];
@@ -82,7 +81,7 @@
                 }
 
                 $scope.start = function () {
-                    roomRTC.initMediaSource().then(stream => {
+                    roomRTC.initMediaSource().then((stream) => {
                         var streamUrl = roomRTC.getStreamAsUrl(stream);
                         $timeout(function () {
                             $scope.localVideo = $sce.trustAsResourceUrl(streamUrl);
@@ -98,7 +97,8 @@
         <div class="col-xs-6">
             <h1 ng-if="!isConnected">Connecting to: <span ng-bind="room">demo</span>...</h1>
             <h1 ng-if="isConnected">You are in room: <span ng-bind="room">demo</span></h1>
-            <video class="mirror" id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true" ng-context-menu-disabled="true"></video>
+            <video class="mirror" id="localVideo" width="300" height="200" ng-src="{{localVideo}}" ng-muted="true" resize autoplay="true"
+                ng-context-menu-disabled="true"></video>
             <div class="media-controls">
                 <input type="button" value="Stop" ng-click="stop()">&nbsp;
                 <input type="button" value="Start" ng-click="start()">
