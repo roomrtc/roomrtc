@@ -71,7 +71,7 @@ module.exports = class PeerConnection extends EventEmitter {
             this.parent.emit('iceEnd', this, offerMsg);
         });
 
-        this.on("addStream", event => {
+        this.on("addStream", (event) => {
             // TODO: Support multiple streams, save them to Set ?
             this.stream = event.stream;
             this.stream.psid = `${this.id || this.sid}_${this.stream.id}`;
@@ -80,7 +80,7 @@ module.exports = class PeerConnection extends EventEmitter {
                 track.addEventListener("ended", () => {
                     if (this.isAllTracksEnded(this.stream)) {
                         this.logger.debug("stream ended, id:", this.id);
-                        this.end();
+                        this.end(event.stream);
                     }
                     // notify
                     this.parent.emit('removetrack', track);
@@ -99,9 +99,11 @@ module.exports = class PeerConnection extends EventEmitter {
 				// https://bugzilla.mozilla.org/show_bug.cgi?id=1347578
 				track.addEventListener('ended', () =>
 				{
-					this.logger.debug('track "ended" event [track:%o]', track);
-                    this.end();
-					
+                    if (this.isAllTracksEnded(this.stream)) {
+                        this.logger.debug("stream ended, id:", this.id, track);
+                        this.end(event.stream);
+                    }
+                    // notify					
                     this.parent.emit('removetrack', track);
 				});
             });
@@ -139,13 +141,15 @@ module.exports = class PeerConnection extends EventEmitter {
         this.offer(this.config.constraints);
     }
 
-    end() {
+    end(stream) {
         if (this.isClosed) return;
 
-        this.close();
-        this.isClosed = true;
-        this.parent.removePeerConnection(this);
-        this.parent.emit("peerStreamRemoved", this);
+        let hasListener = this.parent.emit("peerStreamRemoved", this, stream);
+        if (!hasListener) {
+            this.close();
+            this.isClosed = true;
+            this.parent.removePeerConnection(this);
+        }
     }
 
     /**
