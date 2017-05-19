@@ -305,14 +305,15 @@ module.exports = class RoomRTC extends EventEmitter {
     /**
      * handle streaming
      */
-    handlePeerStreamAdded(peer) {
-        let stream = peer.stream;
-        this.logger.debug("A new remote video added:", peer.id);
+    handlePeerStreamAdded(peer, stream) {
+        let sid = stream && stream.id;
+        this.logger.debug("A new remote video added:", peer.id, sid);
         this.emit("videoAdded", peer, stream);
     }
 
-    handlePeerStreamRemoved(peer) {
-        this.logger.debug("A remote video removed:", peer.id);
-        this.emit("videoRemoved", peer);
+    handlePeerStreamRemoved(peer, stream) {
+        let sid = stream && stream.id;
+        this.logger.debug("A remote video removed:", peer.id, sid);
+        this.emit("videoRemoved", peer, stream);
     }
 }
