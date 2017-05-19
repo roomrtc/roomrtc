@@ -73,14 +73,15 @@ module.exports = class PeerConnection extends EventEmitter {
 
         this.on("addStream", (event) => {
             // TODO: Support multiple streams, save them to Set ?
-            this.stream = event.stream;
+            let stream = event.stream;
+            this.stream = stream;
             this.stream.psid = `${this.id || this.sid}_${this.stream.id}`;
 
             for (let track of this.stream.getTracks()) {
                 track.addEventListener("ended", () => {
                     if (this.isAllTracksEnded(this.stream)) {
                         this.logger.debug("stream ended, id:", this.id);
-                        this.end(event.stream);
+                        this.end(stream);
                     }
                     // notify
                     this.parent.emit('removetrack', track);
@@ -101,14 +102,14 @@ module.exports = class PeerConnection extends EventEmitter {
 				{
                     if (this.isAllTracksEnded(this.stream)) {
                         this.logger.debug("stream ended, id:", this.id, track);
-                        this.end(event.stream);
+                        this.end(stream);
                     }
                     // notify					
                     this.parent.emit('removetrack', track);
 				});
             });
 
-            this.parent.emit("peerStreamAdded", this);
+            this.parent.emit("peerStreamAdded", this, stream);
         });
 
     }
