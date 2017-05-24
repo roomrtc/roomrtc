@@ -3,7 +3,7 @@ var path = require('path'),
     session = require('express-session'),
     cookieParser = require('cookie-parser'),
     bodyParser = require('body-parser'),
-    logger = console;
+    logger = require('signaling/logger')('RoomRTC');
 
 
 var app = express();
@@ -35,8 +35,9 @@ var port = process.env.PORT || 8123;
 var server = require('http').Server(app);
 var roomrtc = new RoomrtcServer();
 
-
 roomrtc.listen(server);
 server.listen(port, function () {
     logger.info('server is running at: ', port);
 });
+
+module.exports = roomrtc;
