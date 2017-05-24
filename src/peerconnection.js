@@ -29,7 +29,8 @@ module.exports = class PeerConnection extends EventEmitter {
         this.stream = null;
 
         this.pc = this.createRTCPeerConnection(this.parent.config.peerConnectionConfig, this.parent.config.peerConnectionConstraints);
-        this.pc.addStream(this.localStream);
+        // this.pc.addStream(this.localStream);
+        this.addStream(this.localStream);
 
         // bind event to handle peer message
         this.getLocalStreams = this.pc.getLocalStreams.bind(this.pc);
@@ -304,6 +305,9 @@ module.exports = class PeerConnection extends EventEmitter {
      * Add localStream to the peer connection
      */
     addStream(stream) {
+        if (!stream) {
+            return this.logger.warn('Stream must not be null');
+        }
         this.logger.debug("Got the stream!");
         this.localStream = stream;
         this.pc.addStream(stream);
