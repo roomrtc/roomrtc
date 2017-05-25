@@ -2,7 +2,9 @@ RoomRTC
 ================
 RoomRTC enables quick development of webRTC
 
-**Status**: v1.0.0 coming soon.
+[![npm version](https://img.shields.io/npm/v/roomrtc.svg?style=flat)](https://www.npmjs.com/package/roomrtc)
+
+**Status**: `v1.0.0` coming soon.
 
 Installation In A Nutshell
 ===========================
@@ -20,6 +22,7 @@ Website and documentation
 =========================
 
 * Visit [roomrtc.github.io](https://roomrtc.github.io) to explore demos and examples.
+* Demo [demo.roomrtc.com](https://demo.roomrtc.com)
 
 Run roomrtc as your own server:
 

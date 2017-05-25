@@ -1,10 +1,10 @@
 {
   "name": "roomrtc",
-  "version": "0.11.3",
+  "version": "0.12.0",
   "description": "RoomRTC enables quick development of webRTC",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node test/client.js | tap-spec",
     "start": "node basicServer",
     "demo": "node dist/demo.js",
     "build": "node build.js",
@@ -29,7 +29,7 @@
     "bowser": "^1.6.1",
     "eventemitter2": "2.2.1",
     "promise": "7.1.1",
-    "signaling": "^0.11.0",
+    "signaling": "^1.1.0",
     "socket.io-client": "1.7.2",
     "webrtc-adapter": "2.1.0"
   },
@@ -41,6 +41,10 @@
     "cookie-parser": "^1.4.3",
     "express": "^4.14.0",
     "express-session": "^1.14.2",
+    "supertest": "^2.0.1",
+    "tap-spec": "^4.1.1",
+    "tape": "^4.6.3",
+    "tape-run": "^3.0.0",
     "uglify-js": "2.7.5",
     "uglifyify": "^3.0.4"
   }
